@@ -64,7 +64,7 @@ def full_reset_and_calibrate(odrv0):
     odrv0.axis0.min_endstop.config.gpio_num = 5
     odrv0.axis0.min_endstop.config.is_active_high = False
     # odrv0.axis0.min_endstop.config.offset = -10.5
-    odrv0.axis0.min_endstop.config.offset = -10.5  #-10.5
+    odrv0.axis0.min_endstop.config.offset = -13.7  #-10.5
     odrv0.axis0.min_endstop.config.enabled = True
 
     #homing setup
@@ -87,7 +87,7 @@ def full_reset_and_calibrate(odrv0):
     odrv0.axis1.min_endstop.config.gpio_num = 4
     odrv0.axis1.min_endstop.config.is_active_high = False
     # odrv0.axis1.min_endstop.config.offset = -10.5
-    odrv0.axis1.min_endstop.config.offset = -10.5  #-10.5
+    odrv0.axis1.min_endstop.config.offset = -13.7  #-10.5
     odrv0.axis1.min_endstop.config.enabled = True
 
     #homing setup
@@ -283,14 +283,15 @@ def debug_old(odrv0):
 def debug(odrv0):
     odrv0.axis0.motor.config.current_lim = 20
     odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis0.controller.config.input_filter_bandwidth = 5 # Set the filter bandwidth [1/s]
+    odrv0.axis0.controller.config.input_filter_bandwidth = 4 # Set the filter bandwidth [1/s]
     odrv0.axis0.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
     
     odrv0.axis1.motor.config.current_lim = 20
     odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis1.controller.config.input_filter_bandwidth = 5 # Set the filter bandwidth [1/s]
+    odrv0.axis1.controller.config.input_filter_bandwidth = 4 # Set the filter bandwidth [1/s]
     odrv0.axis1.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
 
+    #commands = [[-7,0],[-5.5,5.5],[0,7],[5.5,5.5],[7,0],[5.5,-5.5],[0,-7],[-5.5,-5.5]]  
     commands = [[-10,0],[-7.5,7.5],[0,10],[7.5,7.5],[10,0],[7.5,-7.5],[0,-10],[-7.5,-7.5]]  
 
     # while True:
@@ -307,7 +308,7 @@ def debug(odrv0):
             check_state(odrv0)
             if state != 4:
                 state_machine(odrv0)
-            time.sleep(0.5) #0.2 for fast
+            time.sleep(0.2) #0.2 for fast
 
 
 
@@ -346,10 +347,8 @@ def state_machine(odrv0):
         test_procedure(odrv0)
 
     if state == 4:
-        # debug(odrv0)
-        pwmState(odrv0)
-
-
+        debug(odrv0)
+        # pwmState(odrv0)
 
     if state > 4 or state < 0:
         print("error, incorrect state. Entering idle")
