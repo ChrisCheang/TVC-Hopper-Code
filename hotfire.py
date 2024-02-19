@@ -1,5 +1,6 @@
 import odrive
 from odrive.enums import *
+import numpy as np
 import time
 #from fibre.libfibre import ObjectLostError
 
@@ -192,44 +193,84 @@ def lock_pos(odrv0,r2_pos,d2_pos):
         time.sleep(t_sleep)
 
 
+
+def test_procedure_alt(odrv0):
+    print("entered test procedure")
+    START_POS_R2 = 0
+    START_POS_D2 = 0
+    CPR = 8192
+
+    odrv0.axis0.motor.config.current_lim = 20
+    odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+    odrv0.axis0.controller.config.input_filter_bandwidth = 4 # Set the filter bandwidth [1/s]
+    odrv0.axis0.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
+    
+    odrv0.axis1.motor.config.current_lim = 20
+    odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+    odrv0.axis1.controller.config.input_filter_bandwidth = 4 # Set the filter bandwidth [1/s]
+    odrv0.axis1.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
+
+    #moving back to centre to prevent big jolts from other states
+    odrv0.axis0.controller.input_pos=0
+    odrv0.axis1.controller.input_pos=0
+    time.sleep(3)
+
+    commands = [[-10,0],[-7.5,7.5],[0,10],[7.5,7.5],[10,0],[7.5,-7.5],[0,-10],[-7.5,-7.5],[-10,0],[-7.5,7.5],[0,10],[7.5,7.5],[10,0],[7.5,-7.5],[0,-10],[-7.5,-7.5]]  
+
+    for i in commands:
+        odrv0.axis0.controller.input_pos=i[0]
+        odrv0.axis1.controller.input_pos=i[1]
+        #add something here to check both motors positions instead of just one
+        check_state(odrv0)
+        if state != 4:
+            state_machine(odrv0)
+        time.sleep(0.2) #0.2 for fast
+
+    odrv0.axis0.controller.input_pos=0
+    odrv0.axis1.controller.input_pos=0
+
+    
 def test_procedure(odrv0):
     print("entered test procedure")
     START_POS_R2 = 0
     START_POS_D2 = 0
     CPR = 8192
 
-    odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis0.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
-    odrv0.axis0.trap_traj.config.vel_limit = 40
-    odrv0.axis0.trap_traj.config.accel_limit = 20
-    odrv0.axis0.trap_traj.config.decel_limit = 20
     odrv0.axis0.motor.config.current_lim = 20
-
-    odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis1.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
-    odrv0.axis1.trap_traj.config.vel_limit = 40
-    odrv0.axis1.trap_traj.config.accel_limit = 20
-    odrv0.axis1.trap_traj.config.decel_limit = 20
+    odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+    odrv0.axis0.controller.config.input_filter_bandwidth = 2 # Set the filter bandwidth [1/s]
+    odrv0.axis0.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
+    
     odrv0.axis1.motor.config.current_lim = 20
+    odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+    odrv0.axis1.controller.config.input_filter_bandwidth = 2 # Set the filter bandwidth [1/s]
+    odrv0.axis1.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
 
-    commands = [[-6,0],[0,6],[6,0],[0,-6]]
 
-    odrv0.axis0.controller.input_pos = 0
-    odrv0.axis1.controller.input_pos = 0
+    #moving back to centre to prevent big jolts from other states
+    odrv0.axis0.controller.input_pos=0
+    odrv0.axis1.controller.input_pos=0
+    time.sleep(3)
 
-    time.sleep(5)
+    odrv0.axis0.controller.config.input_filter_bandwidth = 8 # Increase filter bandwidth for circle
+    odrv0.axis1.controller.config.input_filter_bandwidth = 8 # Increase filter bandwidth for circle
 
-    for i in commands:
+    waypoints0 = [0,-0.1,-0.2,-0.4784,-0.9616,-1.4496,-1.9422,-2.4395,-2.9414,-3.4477,-3.9584,-4.4734,-4.9925,-4.4935,-3.9541,-3.3798,-2.7764,-2.1498,-1.5063,-0.8521,-0.1935,0.4631,1.1115,1.7456,2.3594,2.9472,3.5036,4.0234,4.5018,4.9346,5.3177,5.6477,5.9216,6.1371,6.2922,6.3856,6.4166,6.3848,6.2906,6.1350,5.9192,5.6454,5.3158,4.9335,4.5018,4.0247,3.5063,2.9513,2.3648,1.7520,1.1187,0.4707,-0.1858,-0.8447,-1.4996,-2.1440,-2.7717,-3.3764,-3.9520,-4.4925,-4.9925,-5.4468,-5.8507,-6.1998,-6.4905,-6.7198,-6.8853,-6.9851,-7.0183,-6.9845,-6.8842,-6.7183,-6.4888,-6.1981,-5.8493,-5.4460,-4.9925,-4.4733,-3.9584,-3.4477,-2.9414,-2.4395,-1.9422,-1.4495,-0.9616,-0.4784,0]
+    waypoints1 = [0,-0.1,-0.2,-0.4784,-0.9616,-1.4496,-1.9423,-2.4396,-2.9414,-3.4477,-3.9584,-4.4734,-4.9925,-5.4460,-5.8493,-6.1981,-6.4888,-6.7183,-6.8842,-6.9845,-7.0183,-6.9851,-6.8853,-6.7198,-6.4905,-6.1998,-5.8506,-5.4468,-4.9925,-4.4925,-3.9519,-3.3764,-2.7717,-2.1440,-1.4996,-0.8447,-0.1858,0.4708,1.1187,1.7520,2.3648,2.9513,3.5063,4.0247,4.5018,4.9335,5.3158,5.6454,5.9192,6.1350,6.2906,6.3848,6.4166,6.3856,6.2922,6.1371,5.9216,5.6477,5.3177,4.9346,4.5018,4.0234,3.5036,2.9472,2.3594,1.7456,1.1115,0.4631,-0.1935,-0.8521,-1.5063,-2.1498,-2.7764,-3.3799,-3.9542,-4.4935,-4.9925,-4.4733,-3.9584,-3.4477,-2.9414,-2.4395,-1.9422,-1.4495,-0.9616,-0.4784,0]
+
+    waypoints = []
+    for i in range(len(waypoints0)):
+        waypoints.append([waypoints0[i], waypoints1[i]])
+
+
+    for i in waypoints:
         odrv0.axis0.controller.input_pos=i[0]
         odrv0.axis1.controller.input_pos=i[1]
 
-        #add something here to check both motors positions instead of just one
-
-        while (odrv0.axis0.encoder.shadow_count < (i[0]*CPR)-20 or odrv0.axis0.encoder.shadow_count > (i[0]*CPR)+20):
-            check_state(odrv0)
-            if state != 3:
-                state_machine(odrv0)
-            time.sleep(t_sleep)
+        check_state(odrv0)
+        if state != 3:
+            state_machine(odrv0)
+        time.sleep(0.05)
 
     odrv0.axis0.controller.input_pos = 0
     odrv0.axis1.controller.input_pos = 0
@@ -294,6 +335,9 @@ def debug(odrv0):
     #commands = [[-7,0],[-5.5,5.5],[0,7],[5.5,5.5],[7,0],[5.5,-5.5],[0,-7],[-5.5,-5.5]]  
     commands = [[-10,0],[-7.5,7.5],[0,10],[7.5,7.5],[10,0],[7.5,-7.5],[0,-10],[-7.5,-7.5]]  
 
+    #waypoints0 = [0,-0.4784,-0.9616,-1.4496,-1.9422,-2.4395,-2.9414,-3.4477,-3.9584,-4.4734,-4.9925,-4.4935,-3.9541,-3.3798,-2.7764,-2.1498,-1.5063,-0.8521,-0.1935,0.4631,1.1115,1.7456,2.3594,2.9472,3.5036,4.0234,4.5018,4.9346,5.3177,5.6477,5.9216,6.1371,6.2922,6.3856,6.4166,6.3848,6.2906,6.1350,5.9192,5.6454,5.3158,4.9335,4.5018,4.0247,3.5063,2.9513,2.3648,1.7520,1.1187,0.4707,-0.1858,-0.8447,-1.4996,-2.1440,-2.7717,-3.3764,-3.9520,-4.4925,-4.9925,-5.4468,-5.8507,-6.1998,-6.4905,-6.7198,-6.8853,-6.9851,-7.0183,-6.9845,-6.8842,-6.7183,-6.4888,-6.1981,-5.8493,-5.4460,-4.9925,-4.4733,-3.9584,-3.4477,-2.9414,-2.4395,-1.9422,-1.4495,-0.9616,-0.4784,0]
+    #waypoints1 = [0,-0.4784,-0.9616,-1.4496,-1.9423,-2.4396,-2.9414,-3.4477,-3.9584,-4.4734,-4.9925,-5.4460,-5.8493,-6.1981,-6.4888,-6.7183,-6.8842,-6.9845,-7.0183,-6.9851,-6.8853,-6.7198,-6.4905,-6.1998,-5.8506,-5.4468,-4.9925,-4.4925,-3.9519,-3.3764,-2.7717,-2.1440,-1.4996,-0.8447,-0.1858,0.4708,1.1187,1.7520,2.3648,2.9513,3.5063,4.0247,4.5018,4.9335,5.3158,5.6454,5.9192,6.1350,6.2906,6.3848,6.4166,6.3856,6.2922,6.1371,5.9216,5.6477,5.3177,4.9346,4.5018,4.0234,3.5036,2.9472,2.3594,1.7456,1.1115,0.4631,-0.1935,-0.8521,-1.5063,-2.1498,-2.7764,-3.3799,-3.9542,-4.4935,-4.9925,-4.4733,-3.9584,-3.4477,-2.9414,-2.4395,-1.9422,-1.4495,-0.9616,-0.4784,0]
+
     # while True:
     #     check_state(odrv0)
     #     if state != 4:
@@ -329,6 +373,7 @@ def state_machine(odrv0):
 
     check_state(odrv0)
     print("state: ", state)
+
     if state == 0:
         idle_state(odrv0)
 
