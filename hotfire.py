@@ -1,14 +1,19 @@
 import odrive
 from odrive.enums import *
-import numpy as np
 import time
+import datetime
+import csv
+from datetime import date
+from datetime import datetime
+
 #from fibre.libfibre import ObjectLostError
 
 global state
 state = 0
 
-global t_sleep
+global t_sleep, csv_writer
 t_sleep = 0.05
+csv_writer = None
 
 def idle_state(odrv0):
     print("entered idle")
@@ -65,7 +70,7 @@ def full_reset_and_calibrate(odrv0):
     odrv0.axis0.min_endstop.config.gpio_num = 5
     odrv0.axis0.min_endstop.config.is_active_high = False
     # odrv0.axis0.min_endstop.config.offset = -10.5
-    odrv0.axis0.min_endstop.config.offset = -13.7  #-10.5
+    odrv0.axis0.min_endstop.config.offset = -10.3  #-10.5
     odrv0.axis0.min_endstop.config.enabled = True
 
     #homing setup
@@ -88,7 +93,7 @@ def full_reset_and_calibrate(odrv0):
     odrv0.axis1.min_endstop.config.gpio_num = 4
     odrv0.axis1.min_endstop.config.is_active_high = False
     # odrv0.axis1.min_endstop.config.offset = -10.5
-    odrv0.axis1.min_endstop.config.offset = -13.7  #-10.5
+    odrv0.axis1.min_endstop.config.offset = -10.3  #-10.5
     odrv0.axis1.min_endstop.config.enabled = True
 
     #homing setup
@@ -98,7 +103,6 @@ def full_reset_and_calibrate(odrv0):
     odrv0.axis1.trap_traj.config.accel_limit = 2
     odrv0.axis1.trap_traj.config.decel_limit = 2
 
-    initializeRCPWM(odrv0)
 
 
     print("Motor 1: Calibration parameters set [6/9]")
@@ -160,31 +164,35 @@ def full_reset_and_calibrate(odrv0):
             state_machine(odrv0)
         time.sleep(t_sleep)
 
-    
 
 
-def lock_pos(odrv0,r2_pos,d2_pos):
+
+def lock_pos(odrv0,a,b):
     print("entered lock pos")
-    odrv0.axis0.requested_state = AXIS_STATE_IDLE
-    time.sleep(0.1)
+    #odrv0.axis0.requested_state = AXIS_STATE_IDLE
+    #time.sleep(0.1)
+    odrv0.axis0.motor.config.current_lim = 30
+
     odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
     odrv0.axis0.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
     odrv0.axis0.trap_traj.config.vel_limit = 20
     odrv0.axis0.trap_traj.config.accel_limit = 20
     odrv0.axis0.trap_traj.config.decel_limit = 20
 
-    odrv0.axis1.requested_state = AXIS_STATE_IDLE
-    time.sleep(0.1)
+    #odrv0.axis1.requested_state = AXIS_STATE_IDLE
+    #time.sleep(0.1)
+    odrv0.axis1.motor.config.current_lim = 30
+
     odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
     odrv0.axis1.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
     odrv0.axis1.trap_traj.config.vel_limit = 20
     odrv0.axis1.trap_traj.config.accel_limit = 20
     odrv0.axis1.trap_traj.config.decel_limit = 20
 
-    #odrv0.axis0.controller.input_pos = (odrv0.axis0.encoder.shadow_count/8192)
-    #odrv0.axis1.controller.input_pos = (odrv0.axis0.encoder.shadow_count/8192)
-    odrv0.axis0.controller.input_pos = 0
-    odrv0.axis1.controller.input_pos = 0
+    odrv0.axis0.controller.input_pos = (odrv0.axis0.encoder.shadow_count/8192)
+    odrv0.axis1.controller.input_pos = (odrv0.axis1.encoder.shadow_count/8192)
+    #odrv0.axis0.controller.input_pos = 0
+    #odrv0.axis1.controller.input_pos = 0
 
     while True:
         check_state(odrv0)
@@ -193,75 +201,37 @@ def lock_pos(odrv0,r2_pos,d2_pos):
         time.sleep(t_sleep)
 
 
-
-def test_procedure_alt(odrv0):
-    print("entered test procedure")
-    START_POS_R2 = 0
-    START_POS_D2 = 0
-    CPR = 8192
-
-    odrv0.axis0.motor.config.current_lim = 20
-    odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis0.controller.config.input_filter_bandwidth = 4 # Set the filter bandwidth [1/s]
-    odrv0.axis0.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
-    
-    odrv0.axis1.motor.config.current_lim = 20
-    odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis1.controller.config.input_filter_bandwidth = 4 # Set the filter bandwidth [1/s]
-    odrv0.axis1.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
-
-    #moving back to centre to prevent big jolts from other states
-    odrv0.axis0.controller.input_pos=0
-    odrv0.axis1.controller.input_pos=0
-    time.sleep(3)
-
-    commands = [[-10,0],[-7.5,7.5],[0,10],[7.5,7.5],[10,0],[7.5,-7.5],[0,-10],[-7.5,-7.5],[-10,0],[-7.5,7.5],[0,10],[7.5,7.5],[10,0],[7.5,-7.5],[0,-10],[-7.5,-7.5]]  
-
-    for i in commands:
-        odrv0.axis0.controller.input_pos=i[0]
-        odrv0.axis1.controller.input_pos=i[1]
-        #add something here to check both motors positions instead of just one
-        check_state(odrv0)
-        if state != 4:
-            state_machine(odrv0)
-        time.sleep(0.2) #0.2 for fast
-
-    odrv0.axis0.controller.input_pos=0
-    odrv0.axis1.controller.input_pos=0
-
-    
 def test_procedure(odrv0):
     print("entered test procedure")
     START_POS_R2 = 0
     START_POS_D2 = 0
     CPR = 8192
 
-    odrv0.axis0.motor.config.current_lim = 20
+    odrv0.axis0.motor.config.current_lim = 30
     odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis0.controller.config.input_filter_bandwidth = 2 # Set the filter bandwidth [1/s]
+    odrv0.axis0.controller.config.input_filter_bandwidth = 3 # Set the filter bandwidth [1/s]
     odrv0.axis0.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
     
-    odrv0.axis1.motor.config.current_lim = 20
+    odrv0.axis1.motor.config.current_lim = 30
     odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis1.controller.config.input_filter_bandwidth = 2 # Set the filter bandwidth [1/s]
+    odrv0.axis1.controller.config.input_filter_bandwidth = 3 # Set the filter bandwidth [1/s]
     odrv0.axis1.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
 
 
-    #moving back to centre to prevent big jolts from other states
-    odrv0.axis0.controller.input_pos=0
-    odrv0.axis1.controller.input_pos=0
-    time.sleep(3)
+    #move to 14 up
+    odrv0.axis0.controller.input_pos=7.1774
+    odrv0.axis1.controller.input_pos=7.1774
+    time.sleep(1.2)
 
-    odrv0.axis0.controller.config.input_filter_bandwidth = 8 # Increase filter bandwidth for circle
-    odrv0.axis1.controller.config.input_filter_bandwidth = 8 # Increase filter bandwidth for circle
+    odrv0.axis0.controller.config.input_filter_bandwidth = 9 # Increase filter bandwidth for circles
+    odrv0.axis1.controller.config.input_filter_bandwidth = 9 # Increase filter bandwidth for circles
 
-    waypoints0 = [0,-0.1,-0.2,-0.4784,-0.9616,-1.4496,-1.9422,-2.4395,-2.9414,-3.4477,-3.9584,-4.4734,-4.9925,-4.4935,-3.9541,-3.3798,-2.7764,-2.1498,-1.5063,-0.8521,-0.1935,0.4631,1.1115,1.7456,2.3594,2.9472,3.5036,4.0234,4.5018,4.9346,5.3177,5.6477,5.9216,6.1371,6.2922,6.3856,6.4166,6.3848,6.2906,6.1350,5.9192,5.6454,5.3158,4.9335,4.5018,4.0247,3.5063,2.9513,2.3648,1.7520,1.1187,0.4707,-0.1858,-0.8447,-1.4996,-2.1440,-2.7717,-3.3764,-3.9520,-4.4925,-4.9925,-5.4468,-5.8507,-6.1998,-6.4905,-6.7198,-6.8853,-6.9851,-7.0183,-6.9845,-6.8842,-6.7183,-6.4888,-6.1981,-5.8493,-5.4460,-4.9925,-4.4733,-3.9584,-3.4477,-2.9414,-2.4395,-1.9422,-1.4495,-0.9616,-0.4784,0]
-    waypoints1 = [0,-0.1,-0.2,-0.4784,-0.9616,-1.4496,-1.9423,-2.4396,-2.9414,-3.4477,-3.9584,-4.4734,-4.9925,-5.4460,-5.8493,-6.1981,-6.4888,-6.7183,-6.8842,-6.9845,-7.0183,-6.9851,-6.8853,-6.7198,-6.4905,-6.1998,-5.8506,-5.4468,-4.9925,-4.4925,-3.9519,-3.3764,-2.7717,-2.1440,-1.4996,-0.8447,-0.1858,0.4708,1.1187,1.7520,2.3648,2.9513,3.5063,4.0247,4.5018,4.9335,5.3158,5.6454,5.9192,6.1350,6.2906,6.3848,6.4166,6.3856,6.2922,6.1371,5.9216,5.6477,5.3177,4.9346,4.5018,4.0234,3.5036,2.9472,2.3594,1.7456,1.1115,0.4631,-0.1935,-0.8521,-1.5063,-2.1498,-2.7764,-3.3799,-3.9542,-4.4935,-4.9925,-4.4733,-3.9584,-3.4477,-2.9414,-2.4395,-1.9422,-1.4495,-0.9616,-0.4784,0]
 
-    waypoints = []
-    for i in range(len(waypoints0)):
-        waypoints.append([waypoints0[i], waypoints1[i]])
+    #14 deg circle - starts at 14 up, circle, ends at 14 up (65 waypoints)
+    waypoints0 = [-7.1774,-6.4577,-5.6811,-4.8557,-3.9901,-3.0931,-2.1735,-1.2403,-0.3026,0.6309,1.5512,2.4500,3.3189,4.1500,4.9358,5.6692,6.3436,6.9531,7.4922,7.9561,8.3410,8.6434,8.8608,8.9915,9.0344,8.9893,8.8568,8.6380,8.3350,7.9505,7.4876,6.9505,6.3436,5.6722,4.9421,4.1595,3.3312,2.4646,1.5674,0.6478,-0.2858,-1.2245,-2.1594,-3.0811,-3.9807,-4.8489,-5.6768,-6.4558,-7.1774,-7.8341,-8.4186,-8.9245,-9.3462,-9.6791,-9.9194,-10.0645,-10.1127,-10.0635,-9.9176,-9.6766,-9.3433,-8.9216,-8.4161,-7.8326,-7.1774]
+    waypoints1 = [-7.1774,-7.8326,-8.4161,-8.9216,-9.3433,-9.6766,-9.9176,-10.0635,-10.1127,-10.0645,-9.9194,-9.6791,-9.3462,-8.9245,-8.4185,-7.8341,-7.1774,-6.4557,-5.6768,-4.8489,-3.9807,-3.0811,-2.1593,-1.2245,-0.2858,0.6478,1.5674,2.4646,3.3312,4.1595,4.9421,5.6723,6.3436,6.9505,7.4876,7.9505,8.3350,8.6380,8.8568,8.9893,9.0344,8.9915,8.8608,8.6434,8.3410,7.9561,7.4922,6.9531,6.3436,5.6692,4.9358,4.1500,3.3189,2.4500,1.5512,0.6308,-0.3026,-1.2403,-2.1735,-3.0931,-3.9902,-4.8557,-5.6811,-6.4577,-7.1774]
 
+    waypoints = [[-waypoints0[i],-waypoints1[i]] for i in range(len(waypoints0))]
 
     for i in waypoints:
         odrv0.axis0.controller.input_pos=i[0]
@@ -270,8 +240,42 @@ def test_procedure(odrv0):
         check_state(odrv0)
         if state != 3:
             state_machine(odrv0)
-        time.sleep(0.05)
+        time.sleep(0.03)
 
+    #move to 10 deg up to prepare for fast circle
+    odrv0.axis0.controller.config.input_filter_bandwidth = 8 # Decrease filter bandwidth to move to 10 deg up
+    odrv0.axis1.controller.config.input_filter_bandwidth = 8 # Decrease filter bandwidth to move to 10 deg up
+    odrv0.axis0.controller.input_pos = 5.06  #10 deg up
+    odrv0.axis1.controller.input_pos = 5.06
+    time.sleep(0.8)
+
+
+    odrv0.axis0.controller.config.input_filter_bandwidth = 50 # Increase filter bandwidth for circles
+    odrv0.axis1.controller.config.input_filter_bandwidth = 50 # Increase filter bandwidth for circles
+
+    #10 deg circle - starts at 10 up, fast circle, ends at 10 up (65 waypoints)
+    waypoints0 = [-5.0552,-4.5449,-3.9934,-3.4064,-2.7899,-2.1500,-1.4930,-0.8254,-0.1536,0.5159,1.1767,1.8228,2.4479,3.0464,3.6128,4.1417,4.6285,5.0687,5.4583,5.7940,6.0726,6.2917,6.4495,6.5446,6.5761,6.5438,6.4481,6.2899,6.0706,5.7920,5.4568,5.0678,4.6285,4.1428,3.6150,3.0498,2.4523,1.8280,1.1825,0.5220,-0.1475,-0.8196,-1.4878,-2.1455,-2.7863,-3.4038,-3.9917,-4.5441,-5.0552,-5.5197,-5.9328,-6.2900,-6.5875,-6.8223,-6.9917,-7.0940,-7.1281,-7.0936,-6.9909,-6.8212,-6.5863,-6.2887,-5.9317,-5.5191,-5.0552]
+    waypoints1 = [-5.0552,-5.5191,-5.9317,-6.2887,-6.5863,-6.8212,-6.9909,-7.0936,-7.1281,-7.0940,-6.9917,-6.8223,-6.5875,-6.2899,-5.9327,-5.5197,-5.0552,-4.5441,-3.9917,-3.4038,-2.7863,-2.1455,-1.4878,-0.8196,-0.1475,0.5220,1.1825,1.8280,2.4523,3.0498,3.6150,4.1428,4.6285,5.0678,5.4568,5.7920,6.0706,6.2899,6.4481,6.5438,6.5761,6.5445,6.4495,6.2917,6.0726,5.7940,5.4583,5.0687,4.6285,4.1417,3.6128,3.0464,2.4479,1.8228,1.1767,0.5158,-0.1537,-0.8254,-1.4930,-2.1500,-2.7899,-3.4064,-3.9934,-4.5449,-5.0552]
+
+    waypoints = [[-waypoints0[-i],-waypoints1[-i]] for i in range(len(waypoints0))]  #-i to flip turn direction
+
+    for i in waypoints:
+        odrv0.axis0.controller.input_pos=i[0]
+        odrv0.axis1.controller.input_pos=i[1]
+
+        check_state(odrv0)
+        if state != 3:
+            state_machine(odrv0)
+        time.sleep(0.0003)
+
+    #hold at 10 up for a short bit after circle
+    odrv0.axis0.controller.input_pos = 5.06  #10 deg up
+    odrv0.axis1.controller.input_pos = 5.06
+    time.sleep(0.2)
+
+    #reduce bandwidth and return to neutral
+    odrv0.axis0.controller.config.input_filter_bandwidth = 2.5 # Decrease filter bandwidth to return to neutral
+    odrv0.axis1.controller.config.input_filter_bandwidth = 2.5 # Decrease filter bandwidth to return to neutral
     odrv0.axis0.controller.input_pos = 0
     odrv0.axis1.controller.input_pos = 0
 
@@ -282,6 +286,7 @@ def test_procedure(odrv0):
         time.sleep(t_sleep)
 
 
+##out dated state - ignore
 def debug_old(odrv0):
     print("entered debug")
     START_POS_R2 = 0
@@ -321,51 +326,117 @@ def debug_old(odrv0):
                     state_machine(odrv0)
                 time.sleep(t_sleep)
 
+
+# modify this as necessary to debug anything
 def debug(odrv0):
+    print("entered test procedure")
+    START_POS_R2 = 0
+    START_POS_D2 = 0
+    CPR = 8192
+
+    
+
+
     odrv0.axis0.motor.config.current_lim = 20
     odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis0.controller.config.input_filter_bandwidth = 4 # Set the filter bandwidth [1/s]
+    odrv0.axis0.controller.config.input_filter_bandwidth = 2 # Set the filter bandwidth [1/s]
     odrv0.axis0.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
     
     odrv0.axis1.motor.config.current_lim = 20
     odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis1.controller.config.input_filter_bandwidth = 4 # Set the filter bandwidth [1/s]
+    odrv0.axis1.controller.config.input_filter_bandwidth = 2 # Set the filter bandwidth [1/s]
     odrv0.axis1.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
 
-    #commands = [[-7,0],[-5.5,5.5],[0,7],[5.5,5.5],[7,0],[5.5,-5.5],[0,-7],[-5.5,-5.5]]  
-    commands = [[-10,0],[-7.5,7.5],[0,10],[7.5,7.5],[10,0],[7.5,-7.5],[0,-10],[-7.5,-7.5]]  
 
-    #waypoints0 = [0,-0.4784,-0.9616,-1.4496,-1.9422,-2.4395,-2.9414,-3.4477,-3.9584,-4.4734,-4.9925,-4.4935,-3.9541,-3.3798,-2.7764,-2.1498,-1.5063,-0.8521,-0.1935,0.4631,1.1115,1.7456,2.3594,2.9472,3.5036,4.0234,4.5018,4.9346,5.3177,5.6477,5.9216,6.1371,6.2922,6.3856,6.4166,6.3848,6.2906,6.1350,5.9192,5.6454,5.3158,4.9335,4.5018,4.0247,3.5063,2.9513,2.3648,1.7520,1.1187,0.4707,-0.1858,-0.8447,-1.4996,-2.1440,-2.7717,-3.3764,-3.9520,-4.4925,-4.9925,-5.4468,-5.8507,-6.1998,-6.4905,-6.7198,-6.8853,-6.9851,-7.0183,-6.9845,-6.8842,-6.7183,-6.4888,-6.1981,-5.8493,-5.4460,-4.9925,-4.4733,-3.9584,-3.4477,-2.9414,-2.4395,-1.9422,-1.4495,-0.9616,-0.4784,0]
-    #waypoints1 = [0,-0.4784,-0.9616,-1.4496,-1.9423,-2.4396,-2.9414,-3.4477,-3.9584,-4.4734,-4.9925,-5.4460,-5.8493,-6.1981,-6.4888,-6.7183,-6.8842,-6.9845,-7.0183,-6.9851,-6.8853,-6.7198,-6.4905,-6.1998,-5.8506,-5.4468,-4.9925,-4.4925,-3.9519,-3.3764,-2.7717,-2.1440,-1.4996,-0.8447,-0.1858,0.4708,1.1187,1.7520,2.3648,2.9513,3.5063,4.0247,4.5018,4.9335,5.3158,5.6454,5.9192,6.1350,6.2906,6.3848,6.4166,6.3856,6.2922,6.1371,5.9216,5.6477,5.3177,4.9346,4.5018,4.0234,3.5036,2.9472,2.3594,1.7456,1.1115,0.4631,-0.1935,-0.8521,-1.5063,-2.1498,-2.7764,-3.3799,-3.9542,-4.4935,-4.9925,-4.4733,-3.9584,-3.4477,-2.9414,-2.4395,-1.9422,-1.4495,-0.9616,-0.4784,0]
+    #moving back to centre to prevent big jolts from other states
+    odrv0.axis0.controller.input_pos=0
+    odrv0.axis1.controller.input_pos=0
+    time.sleep(3)
 
-    # while True:
-    #     check_state(odrv0)
-    #     if state != 4:
-    #         state_machine(odrv0)
-    #     time.sleep(0.2)
+    odrv0.axis0.controller.config.input_filter_bandwidth = 8 # Increase filter bandwidth for circle
+    odrv0.axis1.controller.config.input_filter_bandwidth = 8 # Increase filter bandwidth for circle
+
+    waypoints0 = [-6.4577,-5.6811,-4.8557,-3.9901,-3.0931,-2.1735,-1.2403,-0.3026,0.6309,1.5512,2.4500,3.3189,4.1500,4.9358,5.6692,6.3436,6.9531,7.4922,7.9561,8.3410,8.6434,8.8608,8.9915,9.0344,8.9893,8.8568,8.6380,8.3350,7.9505,7.4876,6.9505,6.3436,5.6722,4.9421,4.1595,3.3312,2.4646,1.5674,0.6478,-0.2858,-1.2245,-2.1594,-3.0811,-3.9807,-4.8489,-5.6768,-6.4558,-7.1774,-7.8341,-8.4186,-8.9245,-9.3462,-9.6791,-9.9194,-10.0645,-10.1127,-10.0635,-9.9176,-9.6766,-9.3433,-8.9216,-8.4161,-7.8326]
+    waypoints1 = [-7.8326,-8.4161,-8.9216,-9.3433,-9.6766,-9.9176,-10.0635,-10.1127,-10.0645,-9.9194,-9.6791,-9.3462,-8.9245,-8.4185,-7.8341,-7.1774,-6.4557,-5.6768,-4.8489,-3.9807,-3.0811,-2.1593,-1.2245,-0.2858,0.6478,1.5674,2.4646,3.3312,4.1595,4.9421,5.6723,6.3436,6.9505,7.4876,7.9505,8.3350,8.6380,8.8568,8.9893,9.0344,8.9915,8.8608,8.6434,8.3410,7.9561,7.4922,6.9531,6.3436,5.6692,4.9358,4.1500,3.3189,2.4500,1.5512,0.6308,-0.3026,-1.2403,-2.1735,-3.0931,-3.9902,-4.8557,-5.6811,-6.4577]
+
+    waypoints = []
+    for i in range(len(waypoints0)):
+        waypoints.append([-waypoints0[i], -waypoints1[i]])
+
+    
+    
+
+    odrv0.axis0.controller.input_pos = 0
+    odrv0.axis1.controller.input_pos = 0
 
     while True:
-        for i in commands:
+        for i in waypoints:
             odrv0.axis0.controller.input_pos=i[0]
             odrv0.axis1.controller.input_pos=i[1]
-            #add something here to check both motors positions instead of just one
+
             check_state(odrv0)
             if state != 4:
                 state_machine(odrv0)
-            time.sleep(0.2) #0.2 for fast
+            time.sleep(0.1)
+
+        check_state(odrv0)
+        if state != 4:
+            state_machine(odrv0)
+        time.sleep(t_sleep)
 
 
+
+def armTVC(odrv0):
+    
+    print("entered armed")
+    #odrv0.axis0.requested_state = AXIS_STATE_IDLE
+    #time.sleep(0.1)
+    odrv0.axis0.motor.config.current_lim = 30
+
+
+    odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+    odrv0.axis0.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
+    odrv0.axis0.trap_traj.config.vel_limit = 20
+    odrv0.axis0.trap_traj.config.accel_limit = 20
+    odrv0.axis0.trap_traj.config.decel_limit = 20
+
+    #odrv0.axis1.requested_state = AXIS_STATE_IDLE
+    #time.sleep(0.1)
+    odrv0.axis1.motor.config.current_lim = 30
+
+    odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+    odrv0.axis1.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
+    odrv0.axis1.trap_traj.config.vel_limit = 20
+    odrv0.axis1.trap_traj.config.accel_limit = 20
+    odrv0.axis1.trap_traj.config.decel_limit = 20
+
+    #odrv0.axis0.controller.input_pos = (odrv0.axis0.encoder.shadow_count/8192)
+    #odrv0.axis1.controller.input_pos = (odrv0.axis1.encoder.shadow_count/8192)
+    odrv0.axis0.controller.input_pos = -9
+    odrv0.axis1.controller.input_pos = -9
+
+    while True:
+        check_state(odrv0)
+        if state != 6:
+            state_machine(odrv0)
+        time.sleep(t_sleep)
 
 def check_gpio_num(odrv0, num):
     return (odrv0.get_gpio_states() & (1 << num)) != 0
 
+
 def check_state(odrv0):
-    global state
+    global state,csv_writer
     bit0 = 1 if check_gpio_num(odrv0,6) else 0 #read the gpio pin and set the bit to 0 or 1
     bit1 = 1 if check_gpio_num(odrv0,7) else 0
     bit2 = 1 if check_gpio_num(odrv0,8) else 0
+    
+    data_row = {"Time_(ns)":time.time_ns(),"State":state,"Shadow_M0": odrv0.axis0.encoder.shadow_count,"Shadow_M1":round(odrv0.axis1.encoder.shadow_count,3),"Current_M0":round(odrv0.axis0.motor.current_control.Iq_measured,3),"Current_M1": round(odrv0.axis1.motor.current_control.Iq_measured,3)}
+    csv_writer.writerow(data_row)
+
 
     state = (4 * bit2 + 2 * bit1 + bit0)
+    #state=0
     print("bit0:", check_gpio_num(odrv0,6), " | bit1:", check_gpio_num(odrv0,7), " | bit2:", check_gpio_num(odrv0,8), " | state:", state, " |  Current", round(odrv0.axis0.motor.current_control.Iq_measured,2), " | Step Count", round(odrv0.axis0.encoder.shadow_count,2), " | Turn Count", round(odrv0.axis0.encoder.shadow_count/8192,2))
     print(" |  Current", round(odrv0.axis1.motor.current_control.Iq_measured,2), " | Step Count", round(odrv0.axis1.encoder.shadow_count,2), " | Turn Count", round(odrv0.axis1.encoder.shadow_count/8192,2))
 
@@ -373,8 +444,8 @@ def state_machine(odrv0):
 
     check_state(odrv0)
     print("state: ", state)
-
     if state == 0:
+       armTVC(odrv0)
         idle_state(odrv0)
 
     if state == 1:
@@ -386,75 +457,48 @@ def state_machine(odrv0):
         full_reset_and_calibrate(odrv0)
 
     if state == 2:
+        armTVC(odrv0)
         lock_pos(odrv0,-9,0)
 
     if state == 3:
+        armTVC(odrv0)
         test_procedure(odrv0)
 
     if state == 4:
+        armTVC(odrv0)
         debug(odrv0)
-        # pwmState(odrv0)
 
-    if state > 4 or state < 0:
+    if state == 6:
+        armTVC(odrv0)
+        
+    if state != 6 or state != 1:
+        print("error, incorrect state. Entering idle")
+        idle_state(odrv0)
+
+
+    if state > 6 or state < 0 or state == 5:
         print("error, incorrect state. Entering idle")
         idle_state(odrv0)
 
 def initialise(odrv0):
-    odrv0.config.gpio6_mode = GPIO_MODE_DIGITAL
-    odrv0.config.gpio7_mode = GPIO_MODE_DIGITAL
-    odrv0.config.gpio8_mode = GPIO_MODE_DIGITAL
-
-    odrv0.config.gpio6_mode = GPIO_MODE_DIGITAL_PULL_DOWN
-    odrv0.config.gpio7_mode = GPIO_MODE_DIGITAL_PULL_DOWN
-    odrv0.config.gpio8_mode = GPIO_MODE_DIGITAL_PULL_DOWN
+    odrv0.config.gpio6_mode = 2 #digital pull down
+    odrv0.config.gpio7_mode = 2
+    odrv0.config.gpio8_mode = 2
 
     state_machine(odrv0)
 
-def initializeRCPWM(odrv0):
-    odrv0.config.gpio3_mode = GPIO_MODE_PWM
-    odrv0.config.gpio3_pwm_mapping.min = -10
-    odrv0.config.gpio3_pwm_mapping.max = 10
-    odrv0.config.gpio3_pwm_mapping.endpoint = odrv0.axis1.controller._input_pos_property
 
-    odrv0.config.gpio2_mode = GPIO_MODE_PWM
-    odrv0.config.gpio2_pwm_mapping.min = -10
-    odrv0.config.gpio2_pwm_mapping.max = 10
-    odrv0.config.gpio2_pwm_mapping.endpoint = odrv0.axis0.controller._input_pos_property
 
-def pwmState(odrv0):
-    # initializeRCPWM(odrv0)
 
-    # try: # Reboot causes loss of connection, use try to supress errors
-    #     odrv0.save_configuration()
-    #     odrv0.reboot()
-    # except:
-    #     pass
-    # odrv0 = odrive.find_any() # Reconnect to the Odrive
 
-    # print("Odrive: PWM config saved")
-    # time.sleep(2)
-    # print('restarted')
+now = datetime.now()
+current_time = now.strftime("%H:%M:%S")
 
-    odrv0.axis0.motor.config.current_lim = 20
-    odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis0.controller.config.input_filter_bandwidth = 5 # Set the filter bandwidth [1/s]
-    odrv0.axis0.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
+with open(f"logs/TEST_LOG_{date.today()}_{current_time}","x") as logfile:
     
-    odrv0.axis1.motor.config.current_lim = 20
-    odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis1.controller.config.input_filter_bandwidth = 5 # Set the filter bandwidth [1/s]
-    odrv0.axis1.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
+    logfile_header = ["Time_(ns)","State","Shadow_M0","Shadow_M1", "Current_M0", "Current_M1"]
+    csv_writer = csv.DictWriter(logfile,fieldnames=logfile_header)
+    csv_writer.writeheader()
 
-    while True:
-        check_state(odrv0)
-        if state != 4:
-            state_machine(odrv0)
-        time.sleep(0.2)
-
-
-
-
-
-my_drive = odrive.find_any()
-
-initialise(my_drive)
+    my_drive = odrive.find_any()
+    initialise(my_drive)
