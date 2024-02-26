@@ -445,7 +445,7 @@ def state_machine(odrv0):
     check_state(odrv0)
     print("state: ", state)
     if state == 0:
-       armTVC(odrv0)
+        #armTVC(odrv0)
         idle_state(odrv0)
 
     if state == 1:
@@ -457,24 +457,19 @@ def state_machine(odrv0):
         full_reset_and_calibrate(odrv0)
 
     if state == 2:
-        armTVC(odrv0)
+        #armTVC(odrv0)
         lock_pos(odrv0,-9,0)
 
     if state == 3:
-        armTVC(odrv0)
+        #armTVC(odrv0)
         test_procedure(odrv0)
 
     if state == 4:
-        armTVC(odrv0)
+        #armTVC(odrv0)
         debug(odrv0)
 
     if state == 6:
         armTVC(odrv0)
-        
-    if state != 6 or state != 1:
-        print("error, incorrect state. Entering idle")
-        idle_state(odrv0)
-
 
     if state > 6 or state < 0 or state == 5:
         print("error, incorrect state. Entering idle")
