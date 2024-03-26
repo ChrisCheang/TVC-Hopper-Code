@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 # Tip over analysis
 
-#'''
+'''
 g = 9.81
 m = 150
 v = 2.198
@@ -53,9 +53,9 @@ def tip_angle(sq_width,h_cg):
     return atan(0.5*sq_width/hcg) * 180 / pi
 
 
-#'''
+'''
 
-#'''
+'''
 sq_widths = np.arange(0.5,2,0.01)
 tip_vs = [tip_v(sq_widths[i],hcg) for i in range(len(sq_widths))]
 tip_angles = [tip_angle(sq_widths[i],hcg) for i in range(len(sq_widths))]
@@ -77,7 +77,7 @@ plt.grid(which='major', color='k', linestyle='-', linewidth=0.5)
 plt.grid(which='minor', color='k', linestyle='-', linewidth=0.05)
 plt.minorticks_on()
 plt.show()
-#'''
+'''
 
 
 
@@ -89,14 +89,15 @@ w = 90
 l_top = 500
 l_main = 1230   # bolt to bolt before bolt offset
 bolt_offset = 4.191
+strut_angle = 35
 
 print(" ")
 print(f"CAD sizing stuff below, h = {h}, d = {d}, w = {w}, bolt offset = {bolt_offset}, top plate width = {l_top}")
 
 
-x = 1230*cos(55*pi/180) + d + 2*bolt_offset*cos(35*pi/180)
+x = l_main*cos((90-strut_angle)*pi/180) + d + 2*bolt_offset*cos(strut_angle*pi/180)
 y = w
-z = 1230*sin(55*pi/180) - h - (30-18.26) - 2*bolt_offset*sin(35*pi/180) 
+z = l_main*sin((90-strut_angle)*pi/180) - h - (30-18.26) - 2*bolt_offset*sin(strut_angle*pi/180) 
 
 print(f"x = {x}, y = {y}, z = {z}")
 print(" ")
