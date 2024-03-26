@@ -52,7 +52,6 @@ def tip_v(sq_width,h_cg):
 
 #'''
 sq_widths = np.arange(0.5,2,0.01)
-print(sq_widths)
 tip_vs = [tip_v(sq_widths[i],hcg) for i in range(len(sq_widths))]
 
 plt.xlabel("square width (m)")
