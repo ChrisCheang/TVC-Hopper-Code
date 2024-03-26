@@ -104,21 +104,25 @@ print("side_strut_length = ", side_strut_length)
 print("strut_angle = ", strut_angle)
 
 
+config = 1  #0 for long(default), 1 for short
+
 h = 312
 d = 50
 w = 90
 l_top = 500
-l_main = 1230   # bolt to bolt before bolt offset
-bolt_offset = 4.191
-strut_angle = 35
+l_main = [1230,1160][config]   # bolt to bolt before bolt offset
+bolt_offset = [4.191,5.778][config]   
+c_channel_hole_offset = [18.26, 21.315][config]
+strut_angle = [35,30][config]   
 
 print(" ")
+print("Config = ", config)
 print(f"CAD sizing stuff below, h = {h}, d = {d}, w = {w}, bolt offset = {bolt_offset}, top plate width = {l_top}")
 
 
 x = l_main*cos((90-strut_angle)*pi/180) + d + 2*bolt_offset*cos(strut_angle*pi/180)
 y = w
-z = l_main*sin((90-strut_angle)*pi/180) - h - (30-18.26) - 2*bolt_offset*sin(strut_angle*pi/180) 
+z = l_main*sin((90-strut_angle)*pi/180) - h - (30-c_channel_hole_offset) - 2*bolt_offset*sin(strut_angle*pi/180) 
 
 print(f"x = {x}, y = {y}, z = {z}")
 print(" ")
@@ -156,9 +160,6 @@ print(f"Rod end bracket width offset = {w_ls_set + 32.4}")
 print("threaded rod length = ", threaded_rod_length)
 rod_end_c_channel_angle = atan(w_ls_set/x) * 180 / pi
 print("rod end c channel angle = ", rod_end_c_channel_angle)
-
-
-
 
 
 # Stiffness analysis using trusspy
