@@ -86,8 +86,9 @@ plt.show()
 h = 312
 d = 50
 w = 90
-bolt_offset = 4.191
 l_top = 500
+l_main = 1230   # bolt to bolt before bolt offset
+bolt_offset = 4.191
 
 print(" ")
 print(f"CAD sizing stuff below, h = {h}, d = {d}, w = {w}, bolt offset = {bolt_offset}, top plate width = {l_top}")
