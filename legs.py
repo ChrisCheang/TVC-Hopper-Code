@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 # Tip over analysis
 
-'''
+#'''
 g = 9.81
 m = 150
 v = 2.198
@@ -53,9 +53,9 @@ def tip_angle(sq_width,h_cg):
     return atan(0.5*sq_width/hcg) * 180 / pi
 
 
-'''
+#'''
 
-'''
+#'''
 sq_widths = np.arange(0.5,2,0.01)
 tip_vs = [tip_v(sq_widths[i],hcg) for i in range(len(sq_widths))]
 tip_angles = [tip_angle(sq_widths[i],hcg) for i in range(len(sq_widths))]
@@ -67,7 +67,7 @@ plt.grid(which='major', color='k', linestyle='-', linewidth=0.5)
 plt.grid(which='minor', color='k', linestyle='-', linewidth=0.05)
 plt.minorticks_on()
 plt.plot(sq_widths,tip_vs)
-plt.show()
+#plt.show()
 
 plt.xlabel("square width (m)")
 plt.ylabel("tipping angle (degrees)")
@@ -76,12 +76,33 @@ plt.plot(sq_widths,tip_angles)
 plt.grid(which='major', color='k', linestyle='-', linewidth=0.5)
 plt.grid(which='minor', color='k', linestyle='-', linewidth=0.05)
 plt.minorticks_on()
-plt.show()
-'''
-
+#plt.show()
+#'''
 
 
 # CAD sizing calculations
+
+# Approximate Leg geometry - refer to notebook or slides
+
+xu = 50 * 0.001
+yu = 200 * 0.001
+zu = -300 * 0.001
+
+yg = -600 * 0.001
+zg = -1000 * 0.001
+
+wu = 440 * 0.001
+main_strut_length = sqrt(yg**2+zg**2)
+side_strut_length = sqrt(xu**2+(yu-yg)**2+(zu-zg)**2)
+
+strut_angle = atan(yg/zg) * 180 / pi
+
+print(" ")
+print("Approximate sizings below:")
+print("main_strut_length = ", main_strut_length)
+print("side_strut_length = ", side_strut_length)
+print("strut_angle = ", strut_angle)
+
 
 h = 312
 d = 50
@@ -142,16 +163,7 @@ print("rod end c channel angle = ", rod_end_c_channel_angle)
 
 # Stiffness analysis using trusspy
 
-# Approximate Leg geometry - refer to notebook or slides
 
-xu = 50 * 0.001
-yu = 200 * 0.001
-zu = -300 * 0.001
-
-yg = -700 * 0.001
-zg = -1000 * 0.001
-
-wu = 440 * 0.001
 
 M = tp.Model(logfile=True)
 
