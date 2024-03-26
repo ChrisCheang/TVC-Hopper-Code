@@ -48,17 +48,34 @@ def tip_v(sq_width,h_cg):
     I0 = Ig + m*r**2
     tip_v = sqrt(2*g*I0*(r-h_cg)/(m*h_cg**2))
     return tip_v
+
+def tip_angle(sq_width,h_cg):
+    return atan(0.5*sq_width/hcg) * 180 / pi
+
+
 #'''
 
 #'''
 sq_widths = np.arange(0.5,2,0.01)
 tip_vs = [tip_v(sq_widths[i],hcg) for i in range(len(sq_widths))]
+tip_angles = [tip_angle(sq_widths[i],hcg) for i in range(len(sq_widths))]
 
 plt.xlabel("square width (m)")
 plt.ylabel("critical tip velocity")
 plt.title(f"Tip velocity vs width with h_cg = {hcg} m")
 plt.grid(which='major', color='k', linestyle='-', linewidth=0.5)
+plt.grid(which='minor', color='k', linestyle='-', linewidth=0.05)
+plt.minorticks_on()
 plt.plot(sq_widths,tip_vs)
+plt.show()
+
+plt.xlabel("square width (m)")
+plt.ylabel("tipping angle (degrees)")
+plt.title(f"tip angle vs width with h_cg = {hcg} m")
+plt.plot(sq_widths,tip_angles)
+plt.grid(which='major', color='k', linestyle='-', linewidth=0.5)
+plt.grid(which='minor', color='k', linestyle='-', linewidth=0.05)
+plt.minorticks_on()
 plt.show()
 #'''
 
