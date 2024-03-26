@@ -46,7 +46,7 @@ def tip_v(sq_width,h_cg):
 
     r = sqrt(h_cg**2 + (sq_width/2)**2)
     I0 = Ig + m*r**2
-    tip_v = sqrt(2*m*g*(r-h_cg)/I0) * (Ig + m*r**2) / (m*h_cg)
+    tip_v = sqrt(2*g*I0*(r-h_cg)/(m*h_cg**2))
     return tip_v
 #'''
 
