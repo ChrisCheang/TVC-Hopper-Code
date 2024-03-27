@@ -82,10 +82,17 @@ plt.minorticks_on()
 
 # CAD sizing calculations
 
+
+# Sizing procedure:
+# 1. Determine and input desired h, d, l_top and l_main (exact) and w (approximate)
+# 2. Run code and change CAD according to variables printed out 
+
+
+
 # Approximate Leg geometry - refer to notebook or slides
 
-xu = 50 * 0.001
-yu = 200 * 0.001
+xu = 120 * 0.001
+yu = 50 * 0.001
 zu = -300 * 0.001
 
 yg = -600 * 0.001
@@ -111,12 +118,13 @@ d = 50
 w = 90
 l_top = 500
 l_main = [1230,1160][config]   # bolt to bolt before bolt offset
-bolt_offset = [4.191,5.778][config]   
-c_channel_hole_offset = [18.26, 21.315][config]
+bolt_offset = [4.191,5.778][config]   # this depends on strut angle only
+c_channel_hole_offset = [18.26, 21.315][config]   # this depends on strut angle only
 strut_angle = [35,30][config]   
 
 print(" ")
-print("Config = ", config)
+config = ["long", "short"][config]
+print(f"Config = {config}")
 print(f"CAD sizing stuff below, h = {h}, d = {d}, w = {w}, bolt offset = {bolt_offset}, top plate width = {l_top}")
 
 
@@ -162,7 +170,37 @@ rod_end_c_channel_angle = atan(w_ls_set/x) * 180 / pi
 print("rod end c channel angle = ", rod_end_c_channel_angle)
 
 
+# Stress and force analysis
+
+d = 0.01
+w_outer = 0.0508
+w_inner = 0.0381
+E = 190*10**9
+UTS_6061 = 279*10**6
+
+# put FEA results here
+F_static = 1000
+max_stress_rod = 24*10**6  # max value in FEA for conservative, in reality should be uniform in rod but isn't in the model
+max_stress_strut = -20*10**6
+max_disp = 0.968*10**(-3)
+#
+
+F_rod = max_stress_rod * pi * (d/2)**2  # conservative value
+F_rod_end_fails = 10000   # SKF M10 rod end data, rod end bearing fails before thread pullout at around 13 kN
+rod_SF = F_rod_end_fails/F_rod
+strut_SF = UTS_6061/abs(max_stress_strut)
+
+k = F_static/max_disp
+F_shock = k*sqrt(0.5*m*1*0.2/k)   #1 is effective accel at TWR 0.9, 0.2 is height of landing procedure start
+print("FEA results:")
+print(f"In {F_static} N static loading, Rod = {F_rod} N, Rod SF = {rod_SF}, Strut SF = {strut_SF}")
+print(f"Max shock load per leg = {F_shock} N")
+
+
+
+
 # Stiffness analysis using trusspy
+
 
 
 
@@ -179,7 +217,7 @@ with M.Nodes as MN:  # node creation
 element_type = 1  # truss
 material_type = 1  # linear-elastic
 
-youngs_modulus = 69 * 10**6
+youngs_modulus = 69 * 10**9
 A_large = pi * 0.035 ** 2 - pi * 0.030 ** 2
 A_small = pi * 0.015 ** 2 - pi * 0.012 ** 2
 
@@ -223,7 +261,7 @@ fig, ax = M.plot_model(
     view="3d",
     contour="force",
     lim_scale=(-0.5, 0.5, -0.5, 0.5, -1, 0),
-    force_scale=1,
+    force_scale=0.0001,
     inc=pinc,
 )
 fig.savefig("loaded.png")
@@ -247,4 +285,5 @@ M.plot_movie(
 Disp = "Displacement Z"
 fig, ax = M.plot_history(nodes=[4, 4], X=Disp, Y="Force Z")
 fig.savefig("feet_Disp.png")
+print(" ")
 print("done")
