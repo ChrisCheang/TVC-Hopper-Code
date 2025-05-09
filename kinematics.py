@@ -16,7 +16,7 @@ aMax = 10*np.pi/180; # maximum gimbal angle in radians
 lead = 2; # lead of ball screw in mm
 
 # angles defined positive for movement in the y or x direction respectively
-gimbal_angles = [10*pi/180,10*pi/180]  # a_outer, a_inner
+gimbal_angles = [1*pi/180,90*pi/180]  # a_outer, a_inner
 #print("test inputs: a_outer = ", a_outer*180/pi, ", a_inner = ", a_inner*180/pi)
 
 class TVCKinematics:
@@ -34,7 +34,7 @@ class TVCKinematics:
         return inner.rotate(v_o)
 
     # calculate required actuator lengths to achieve given gimbal angles (inverse kinematics)
-    def actuator_lengths(gimbal_angles):
+    def actuator_lengths_gimbal(gimbal_angles):
         # Actuator 1 is in the first quadrant, 2 in the second
 
         # actuator thrust plate mount points
@@ -59,7 +59,7 @@ class TVCKinematics:
     def gimbal_angles(alengths):
 
         def func(angles):
-            lengths = TVCKinematics.actuator_lengths(angles[0],angles[1])
+            lengths = TVCKinematics.actuator_lengths_gimbal(angles[0],angles[1])
             return [lengths[0]-alengths[0],lengths[1]-alengths[1]]
 
         return fsolve(func,[0,0])
@@ -87,8 +87,36 @@ class TVCKinematics:
             return [xy[0]-xyangles[0],xy[1]-xyangles[1]]
 
         return fsolve(func,xyangles)
-
     
+    def spherical_angles(gimbal_angles): # makes programming circles (if needed) and range tests easier
+        Tvec = TVCKinematics.rotate_gimbal_angles(gimbal_angles,[0,0,-1])
+        xyproj = [Tvec[0],Tvec[1],0]  #projection of thrust vector on xy plane
+        rollangle = TVCKinematics.angle_between_vectors(xyproj,[1,0,0])
+        offsetangle = TVCKinematics.angle_between_vectors(Tvec,[0,0,-1])
+
+        return [offsetangle,rollangle]
+    
+    def gimbal_angles_spherical(spherical_angles):
+        
+        def func(gimbal_angles):
+            sphericals = TVCKinematics.spherical_angles(gimbal_angles)
+            return [sphericals[0]-spherical_angles[0],sphericals[1]-spherical_angles[1]]
+        
+        return fsolve(func,spherical_angles)
+    
+    def actuator_lengths_spherical(spherical_angles):
+        gimbal_angles = TVCKinematics.gimbal_angles_spherical(spherical_angles)
+        return TVCKinematics.actuator_lengths_gimbal(gimbal_angles)
+    
+    def actuator_lengths_xy(xyangles):
+        gimbal_angles = TVCKinematics.gimbal_angles_from_xy(xyangles)
+        return TVCKinematics.actuator_lengths_gimbal(gimbal_angles)
+
+
+
+        
+print(TVCKinematics.actuator_lengths_spherical(gimbal_angles))
+#print([TVCKinematics.spherical_angles(gimbal_angles)[i]*180/pi for i in [0,1]])
 
 
 
