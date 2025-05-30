@@ -15,13 +15,20 @@ global t_sleep, csv_writer
 t_sleep = 0.05
 csv_writer = None
 
-initialized = True
+initialized = False
 
+try: # Reboot causes loss of connection, use try to supress errors
+    odrv0.reboot()
+except:
+    pass
 
 odrv0 = odrive.find_any() # Reconnect to the Odrive
 
-
 if not initialized:
+
+    #odrv0.reboot()
+    odrv0.clear_errors()
+    
 
     odrv0.axis0.min_endstop.config.enabled = False
     odrv0.axis1.min_endstop.config.enabled = False
@@ -32,40 +39,13 @@ if not initialized:
     odrv0.axis0.motor.config.pole_pairs = 11
     odrv0.axis1.motor.config.pole_pairs = 11
 
-    #odrv0.save_configuration() for some reason save config line here disconnects it (27-5)
+    odrv0.axis0.motor.config.resistance_calib_max_voltage = 2.0  # default is 1.0
+    odrv0.axis1.motor.config.resistance_calib_max_voltage = 2.0  # default is 1.0
 
+    #odrv0.save_config() for some reason save config line here disconnects it (27-5)
 
-
-    print("starting motor 1 axis state motor calibration")
-    odrv0.axis1.requested_state = AXIS_STATE_FULL_CALIBRATION_SEQUENCE  #AXIS_STATE_MOTOR_CALIBRATION (see if this is the problem)
-    while odrv0.axis1.current_state != AXIS_STATE_IDLE: # Wait for calibration to be done
-        time.sleep(0.1)
-        print(".", end="")
-
-    print("starting motor 1 axis state encoder offset calibration")
-    odrv0.axis1.requested_state = AXIS_STATE_ENCODER_OFFSET_CALIBRATION
-    while odrv0.axis1.current_state != AXIS_STATE_IDLE: # Wait for calibration to be done
-        time.sleep(0.1)
-        print(".", end="")
-
-    print("starting motor 1 axis state homing (current limit)") # endstops not working, 21-5
-    odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis1.controller.config.vel_ramp_rate = 0.5
-    odrv0.axis1.motor.config.current_lim = 30
-    odrv0.axis1.controller.config.input_mode = INPUT_MODE_VEL_RAMP
-    odrv0.axis1.controller.input_vel = 500
-
-    while round(odrv0.axis1.motor.current_control.Iq_measured,2)<3: # Wait for calibration to be done
-        #time.sleep(0.1)
-        print("current: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
-    
-    odrv0.axis1.controller.input_vel = 0
-    odrv0.axis1.encoder.set_linear_count(0)
-    odrv0.axis1.requested_state = AXIS_STATE_IDLE
-
-
-
-    print("Motor 1: Homing complete, waiting")
+    #odrv0.axis0.config.startup_closed_loop_control = False
+    #odrv0.axis1.config.startup_closed_loop_control = False
 
 
 
@@ -84,7 +64,7 @@ if not initialized:
     print("starting motor 0 axis state homing (current limit)")
     odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
     odrv0.axis0.controller.config.vel_ramp_rate = 0.5
-    odrv0.axis0.motor.config.current_lim = 30
+    odrv0.axis0.motor.config.current_lim = 50
     odrv0.axis0.controller.config.input_mode = INPUT_MODE_VEL_RAMP
     odrv0.axis0.controller.input_vel = 500
     
@@ -99,45 +79,90 @@ if not initialized:
     print("Motor 0: Homing complete")
 
 
+
+
+
+    print("starting motor 1 axis state motor calibration")
+    odrv0.axis1.requested_state = AXIS_STATE_FULL_CALIBRATION_SEQUENCE  #AXIS_STATE_MOTOR_CALIBRATION (see if this is the problem)
+    while odrv0.axis1.current_state != AXIS_STATE_IDLE: # Wait for calibration to be done
+        time.sleep(0.1)
+        print(".", end="")
+
+    print("starting motor 1 axis state encoder offset calibration")
+    odrv0.axis1.requested_state = AXIS_STATE_ENCODER_OFFSET_CALIBRATION
+    while odrv0.axis1.current_state != AXIS_STATE_IDLE: # Wait for calibration to be done
+        time.sleep(0.1)
+        print(".", end="")
+
+    print("starting motor 1 axis state homing (current limit)") # endstops not working, 21-5
+    odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+    odrv0.axis1.controller.config.vel_ramp_rate = 0.5
+    odrv0.axis1.motor.config.current_lim = 50
+    odrv0.axis1.controller.config.input_mode = INPUT_MODE_VEL_RAMP
+    odrv0.axis1.controller.input_vel = 500
+
+    while round(odrv0.axis1.motor.current_control.Iq_measured,2)<3: # Wait for calibration to be done
+        #time.sleep(0.1)
+        print("current: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
+    
+    odrv0.axis1.controller.input_vel = 0
+    odrv0.axis1.encoder.set_linear_count(0)
+    odrv0.axis1.requested_state = AXIS_STATE_IDLE
+
+
+
+    print("Motor 1: Homing complete, waiting")
+
+
+
     initialized = True
 
 
 print("move to middle")
 
+    
+print("moving...")
+
+odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+
+odrv0.axis0.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
+odrv0.axis0.trap_traj.config.vel_limit = 10000
+odrv0.axis0.trap_traj.config.accel_limit = 50
+odrv0.axis0.trap_traj.config.decel_limit = 50
+odrv0.axis0.controller.input_pos = -5
+
+odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+
+odrv0.axis1.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
+odrv0.axis1.trap_traj.config.vel_limit = 10000
+odrv0.axis1.trap_traj.config.accel_limit = 50
+odrv0.axis1.trap_traj.config.decel_limit = 50
+odrv0.axis1.controller.input_pos = -5
+
 while True:
-    
-    print("moving...")
 
-    odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    
-    odrv0.axis0.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
-    odrv0.axis0.trap_traj.config.vel_limit = 200
-    odrv0.axis0.trap_traj.config.accel_limit = 300
-    odrv0.axis0.trap_traj.config.decel_limit = 300
-    odrv0.axis0.controller.input_pos = -5
-
-    odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-
-    odrv0.axis1.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
-    odrv0.axis1.trap_traj.config.vel_limit = 200
-    odrv0.axis1.trap_traj.config.accel_limit = 300
-    odrv0.axis1.trap_traj.config.decel_limit = 300
-    odrv0.axis1.controller.input_pos = -5
+    odrv0.axis1.controller.input_pos = -2
+    odrv0.axis1.controller.input_pos = -2
+    time.sleep(1)
+    odrv0.axis1.controller.input_pos = -12
+    odrv0.axis1.controller.input_pos = -12
+    time.sleep(1)
 
 
 
-    
-    # Endstop Testing (21-5)
-    '''
-    odrv0 = odrive.find_any() # Reconnect to the Odrive
-    #print("endstop 0 = ", odrv0.axis0.min_endstop.endstop_state)
-    #print("endstop 1 = ", odrv0.axis1.min_endstop.endstop_state)
-    gpio_states = odrv0.get_gpio_states()
-    gpio5_state = (gpio_states >> 5) & 1
-    print(f"GPIO5 state: {'HIGH' if gpio5_state else 'LOW'}")
-    #print("GPIO states = ", odrv0.get_gpio_states())
-    time.sleep(0.05)
-    '''
+
+
+# Endstop Testing (21-5)
+'''
+odrv0 = odrive.find_any() # Reconnect to the Odrive
+#print("endstop 0 = ", odrv0.axis0.min_endstop.endstop_state)
+#print("endstop 1 = ", odrv0.axis1.min_endstop.endstop_state)
+gpio_states = odrv0.get_gpio_states()
+gpio5_state = (gpio_states >> 5) & 1
+print(f"GPIO5 state: {'HIGH' if gpio5_state else 'LOW'}")
+#print("GPIO states = ", odrv0.get_gpio_states())
+time.sleep(0.05)
+'''
 
 
 
