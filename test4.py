@@ -221,9 +221,9 @@ def test_procedure(odrv0):
     odrv0.axis0.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
     odrv0.axis1.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
 
-    # check with the ones in the current config first - before today both 2
-    odrv0.axis0.controller.config.input_filter_bandwidth = 15
-    odrv0.axis1.controller.config.input_filter_bandwidth = 15
+    # check with the ones in the current config first - before today both 2, 15 is highest tested
+    odrv0.axis0.controller.config.input_filter_bandwidth = 2
+    odrv0.axis1.controller.config.input_filter_bandwidth = 2
 
     '''
     # 1. Up, circle, down
@@ -279,7 +279,9 @@ def test_procedure(odrv0):
     while t < 12:
         t = datetime.now() - start
         t = t.total_seconds()
-        gimbal_angles = [0*pi/180,stepsweep(t)]
+
+        # change below to change sweep type, [0,stepsweep(t)] is x sweep, [stepsweep(t),0] y sweep, [0.707*stepsweep(t),0.707*stepsweep(t)] act 0 sweep, [0.707*stepsweep(t),-0.707*stepsweep(t)] act 1 sweep
+        gimbal_angles = [1*stepsweep(t),0*stepsweep(t)]    
         actTurns = TVCKinematics.actuator_lengths_gimbal(gimbal_angles, offset=True, unit_turns=True)
         
         odrv0.axis0.controller.input_pos=actTurns[0]
@@ -301,7 +303,7 @@ def test_procedure(odrv0):
     
     #'''
 
-    #'''
+    '''
     # 3. y axis step sweep (outer gimbal)
     # note on the kinematics: would probably be less load on the pi by feeding waypoints, but the kinematics have to be done in real time anyways for flight
     def sinesweep(x,a=0.5,amax=aMax):
@@ -350,7 +352,7 @@ def test_procedure(odrv0):
 
     time.sleep(2)
     
-    #'''
+    '''
 
 
 test_procedure(odrv0)
