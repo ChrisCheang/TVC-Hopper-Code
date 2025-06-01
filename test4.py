@@ -79,7 +79,7 @@ global t_sleep, csv_writer
 t_sleep = 0.05
 csv_writer = None
 
-initialized = False
+initialized = True
 
 try: # Reboot causes loss of connection, use try to supress errors
     odrv0.reboot()
@@ -90,7 +90,119 @@ odrv0 = odrive.find_any() # Reconnect to the Odrive
 
 if not initialized:
 
-    # "Copy working code from cali3.py from the pi"
+    #odrv0.reboot()
+    odrv0.clear_errors()
+    
+
+    odrv0.axis0.min_endstop.config.enabled = False
+    odrv0.axis1.min_endstop.config.enabled = False
+
+    odrv0.axis0.encoder.config.cpr = 8192
+    odrv0.axis1.encoder.config.cpr = 8192
+
+    odrv0.axis0.motor.config.pole_pairs = 11
+    odrv0.axis1.motor.config.pole_pairs = 11
+
+    odrv0.axis0.motor.config.resistance_calib_max_voltage = 2.0  # default is 1.0
+    odrv0.axis1.motor.config.resistance_calib_max_voltage = 2.0  # default is 1.0
+
+    #odrv0.save_configuration() for some reason save config line here disconnects it (27-5)
+
+    #odrv0.axis0.config.startup_closed_loop_control = False
+    #odrv0.axis1.config.startup_closed_loop_control = False
+
+
+
+    print("starting motor 0 axis state motor calibration")
+    odrv0.axis0.requested_state = AXIS_STATE_FULL_CALIBRATION_SEQUENCE  #AXIS_STATE_MOTOR_CALIBRATION (see if this is the problem)
+    while odrv0.axis0.current_state != AXIS_STATE_IDLE: # Wait for calibration to be done
+        time.sleep(0.1)
+        print(".", end="")
+
+    print("starting motor 0 axis state encoder offset calibration")
+    odrv0.axis0.requested_state = AXIS_STATE_ENCODER_OFFSET_CALIBRATION
+    while odrv0.axis0.current_state != AXIS_STATE_IDLE: # Wait for calibration to be done
+        time.sleep(0.1)
+        print(".", end="")
+
+    print("starting motor 0 axis state homing (current limit)")
+    odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+    odrv0.axis0.controller.config.vel_ramp_rate = 0.5
+    odrv0.axis0.motor.config.current_lim = 50
+    odrv0.axis0.controller.config.input_mode = INPUT_MODE_VEL_RAMP
+    odrv0.axis0.controller.input_vel = 500
+    
+    while round(odrv0.axis0.motor.current_control.Iq_measured,2)<4: # Wait for calibration to be done
+        #time.sleep(0.1)
+        print("current: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
+        
+    odrv0.axis0.controller.input_vel = 0
+    odrv0.axis0.encoder.set_linear_count(int(14.5*8192))
+    odrv0.axis0.requested_state = AXIS_STATE_IDLE
+    
+
+    print("Motor 0: Homing complete")
+
+    time.sleep(0.5) #time sleep could help prevent sudden changes
+
+
+    print("starting motor 1 axis state motor calibration")
+    odrv0.axis1.requested_state = AXIS_STATE_FULL_CALIBRATION_SEQUENCE  #AXIS_STATE_MOTOR_CALIBRATION (see if this is the problem)
+    while odrv0.axis1.current_state != AXIS_STATE_IDLE: # Wait for calibration to be done
+        time.sleep(0.1)
+        print(".", end="")
+
+    print("starting motor 1 axis state encoder offset calibration")
+    odrv0.axis1.requested_state = AXIS_STATE_ENCODER_OFFSET_CALIBRATION
+    while odrv0.axis1.current_state != AXIS_STATE_IDLE: # Wait for calibration to be done
+        time.sleep(0.1)
+        print(".", end="")
+
+    print("starting motor 1 axis state homing (current limit)") # endstops not working, 21-5
+    odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+    odrv0.axis1.controller.config.vel_ramp_rate = 0.5
+    odrv0.axis1.motor.config.current_lim = 50
+    odrv0.axis1.controller.config.input_mode = INPUT_MODE_VEL_RAMP
+    odrv0.axis1.controller.input_vel = 500
+
+    while round(odrv0.axis1.motor.current_control.Iq_measured,2)<4: # Wait for calibration to be done
+        #time.sleep(0.1)
+        print("current: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
+    
+    odrv0.axis1.controller.input_vel = 0
+    odrv0.axis1.encoder.set_linear_count(int(14.5*8192))
+    odrv0.axis1.requested_state = AXIS_STATE_IDLE
+
+    time.sleep(0.5)#time sleep could help prevent sudden changes
+
+
+    print("Motor 1: Homing complete")
+
+    print("Movingt to middle")
+
+    odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+    odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
+
+    odrv0.axis0.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
+    odrv0.axis0.trap_traj.config.vel_limit = 10000
+    odrv0.axis0.trap_traj.config.accel_limit = 50
+    odrv0.axis0.trap_traj.config.decel_limit = 50
+
+    odrv0.axis1.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
+    odrv0.axis1.trap_traj.config.vel_limit = 10000
+    odrv0.axis1.trap_traj.config.accel_limit = 50
+    odrv0.axis1.trap_traj.config.decel_limit = 50
+
+    odrv0.axis0.controller.input_pos = 0
+    odrv0.axis1.controller.input_pos = 0
+
+    time.sleep(2)
+
+    odrv0.axis0.requested_state = AXIS_STATE_IDLE
+    odrv0.axis1.requested_state = AXIS_STATE_IDLE
+
+    print("Calibrated")
+
     initialized = True
 
 
@@ -107,18 +219,11 @@ def test_procedure(odrv0):
     odrv0.axis1.motor.config.current_lim = 20
 
     odrv0.axis0.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
-    #odrv0.axis0.trap_traj.config.vel_limit = 10000
-    #odrv0.axis0.trap_traj.config.accel_limit = 50
-    #odrv0.axis0.trap_traj.config.decel_limit = 50
-
     odrv0.axis1.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
-    #odrv0.axis1.trap_traj.config.vel_limit = 10000
-    #odrv0.axis1.trap_traj.config.accel_limit = 50
-    #odrv0.axis1.trap_traj.config.decel_limit = 50
 
-    # check with the ones in the current config first
-    #odrv0.axis0.controller.config.input_filter_bandwidth = 8 
-    #odrv0.axis1.controller.config.input_filter_bandwidth = 8 
+    # check with the ones in the current config first - currently 2
+    odrv0.axis0.controller.config.input_filter_bandwidth = 20
+    odrv0.axis1.controller.config.input_filter_bandwidth = 20
 
 
     # 1. Up, circle, down
@@ -127,19 +232,35 @@ def test_procedure(odrv0):
 
     turns0 = [0, -0.46, -0.93, -1.39, -1.86, -2.32, -2.79, -3.26, -3.73, -4.2, -4.67, -4.18, -3.66, -3.1, -2.52, -1.91, -1.28, -0.65, -0.01, 0.63, 1.26, 1.88, 2.47, 3.04, 3.59, 4.09, 4.56, 4.98, 5.35, 5.67, 5.94, 6.15, 6.3, 6.39, 6.43, 6.39, 6.3, 6.15, 5.94, 5.67, 5.35, 4.98, 4.56, 4.09, 3.59, 3.04, 2.47, 1.88, 1.26, 0.63, -0.01, -0.65, -1.28, -1.91, -2.52, -3.1, -3.66, -4.18, -4.67, -5.11, -5.5, -5.83, -6.11, -6.34, -6.5, -6.59, -6.62, -6.59, -6.5, -6.34, -6.11, -5.83, -5.5, -5.11, -4.67, -4.2, -3.73, -3.26, -2.79, -2.32, -1.86, -1.39, -0.93, -0.46, 0]
     turns1 = [0, -0.46, -0.93, -1.39, -1.86, -2.32, -2.79, -3.26, -3.73, -4.2, -4.67, -5.11, -5.5, -5.83, -6.11, -6.34, -6.5, -6.59, -6.62, -6.59, -6.5, -6.34, -6.11, -5.83, -5.5, -5.11, -4.67, -4.18, -3.66, -3.1, -2.52, -1.91, -1.28, -0.65, -0.01, 0.63, 1.26, 1.88, 2.47, 3.04, 3.59, 4.09, 4.56, 4.98, 5.35, 5.67, 5.94, 6.15, 6.3, 6.39, 6.43, 6.39, 6.3, 6.15, 5.94, 5.67, 5.35, 4.98, 4.56, 4.09, 3.59, 3.04, 2.47, 1.88, 1.26, 0.63, -0.01, -0.65, -1.28, -1.91, -2.52, -3.1, -3.66, -4.18, -4.67, -4.2, -3.73, -3.26, -2.79, -2.32, -1.86, -1.39, -0.93, -0.46, 0]
-
+    
+    currents = []
     turns = []
-    for i in range(len(turns0 )):
+    for i in range(len(turns0)):
         turns.append([turns0[i], turns1[i]])
 
     for i in turns:
+        print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
+        print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
+        currents.append(max(odrv0.axis0.motor.current_control.Iq_measured,odrv0.axis1.motor.current_control.Iq_measured))
         odrv0.axis0.controller.input_pos=i[0]
         odrv0.axis1.controller.input_pos=i[1]
+        time.sleep(0.008)
+
+    for i in turns:
+        print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
+        print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
+        currents.append(max(odrv0.axis0.motor.current_control.Iq_measured,odrv0.axis1.motor.current_control.Iq_measured))
+        odrv0.axis0.controller.input_pos=i[0]
+        odrv0.axis1.controller.input_pos=i[1]
+        time.sleep(0.008)
+
+    print("Max current hit: ", max(currents))
 
     odrv0.axis0.controller.input_pos = 0
     odrv0.axis1.controller.input_pos = 0
 
 
+    '''
     # 2. x axis step sweep (inner gimbal)
     # note on the kinematics: would probably be less load on the pi by feeding waypoints, but the kinematics have to be done in real time anyways for flight
     def sinesweep(x,a=0.5,amax=amax):
@@ -170,6 +291,8 @@ def test_procedure(odrv0):
 
     odrv0.axis0.controller.input_pos = 0
     odrv0.axis1.controller.input_pos = 0
+    '''
+
 
 test_procedure(odrv0)
-
+print("Done")
