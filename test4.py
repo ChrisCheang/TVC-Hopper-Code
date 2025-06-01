@@ -225,7 +225,6 @@ def test_procedure(odrv0):
     odrv0.axis0.controller.config.input_filter_bandwidth = 15
     odrv0.axis1.controller.config.input_filter_bandwidth = 15
 
-
     '''
     # 1. Up, circle, down
     # waypoints from ThrustVectMockup1 matlab - need to fix kinematics.py
@@ -291,11 +290,63 @@ def test_procedure(odrv0):
         print("Actuator target turns: ", actTurns[0],", ", actTurns[1])
         print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
         print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
-        
-    print("Max current hit: ", max(currents))
+
+    x_sweep_max_current = max(currents)    
+    print("Max current hit: ", x_sweep_max_current)
 
     odrv0.axis0.controller.input_pos = 0
     odrv0.axis1.controller.input_pos = 0
+
+    time.sleep(2)
+    
+    #'''
+
+    #'''
+    # 3. y axis step sweep (outer gimbal)
+    # note on the kinematics: would probably be less load on the pi by feeding waypoints, but the kinematics have to be done in real time anyways for flight
+    def sinesweep(x,a=0.5,amax=aMax):
+        # function for defining sinesweep - which will then be converted to "step sweep"
+        # x is time in s, a affects frequency, amax is max angle
+
+        x = np.array(x)  # allows vectorized input
+        result = np.zeros_like(x, dtype=float)
+
+        # Apply the sinusoidal function for 2 < x < 12
+        mask = (x > 2) & (x < 12)
+        result[mask] = amax * np.sin(np.pi * (a * (x[mask] - 2) + 1)**2)
+
+        return result
+    
+    def stepsweep(x, a=0.5, amax=aMax): return amax*np.sign(sinesweep(x, a=a, amax=aMax))
+
+    start = datetime.now()
+    t = 0
+
+    currents = []
+
+    while t < 12:
+        t = datetime.now() - start
+        t = t.total_seconds()
+        gimbal_angles = [stepsweep(t),0*pi/180]
+        actTurns = TVCKinematics.actuator_lengths_gimbal(gimbal_angles, offset=True, unit_turns=True)
+        
+        odrv0.axis0.controller.input_pos=actTurns[0]
+        odrv0.axis1.controller.input_pos=actTurns[1]
+
+        currents.append(max(odrv0.axis0.motor.current_control.Iq_measured,odrv0.axis1.motor.current_control.Iq_measured))
+
+        print("Actuator target turns: ", actTurns[0],", ", actTurns[1])
+        print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
+        print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
+        
+    y_sweep_max_current = max(currents)    
+    print("Max current hit: ", y_sweep_max_current)
+
+    odrv0.axis0.controller.input_pos = 0
+    odrv0.axis1.controller.input_pos = 0
+
+    print("x sweep max current = ", x_sweep_max_current)
+    print("y sweep max current = ", y_sweep_max_current)
 
     time.sleep(2)
     
@@ -307,5 +358,6 @@ test_procedure(odrv0)
 # for testing safety purposes
 odrv0.axis0.requested_state = AXIS_STATE_IDLE
 odrv0.axis1.requested_state = AXIS_STATE_IDLE
+
 
 print("Done")
