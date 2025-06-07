@@ -207,6 +207,27 @@ if not initialized:
     initialized = True
 
 
+now = datetime.now()
+now_ns = time.time_ns()
+current_time = now.strftime("%H_%M_%S")
+data_file = f"TEST_LOG_{date.today()}_{current_time}.csv"
+logfile_header = ["Time_(s)","Turns_M0","Turns_M1", "Current_M0", "Current_M1"]
+
+with open(data_file, "a", newline='') as logfile:
+    writer = csv.DictWriter(logfile, fieldnames=logfile_header)
+    writer.writeheader()  
+    
+
+def data(odrv0):
+    with open(data_file,"a", newline='') as logfile: 
+        writer = csv.DictWriter(logfile, fieldnames=logfile_header)
+        data_row = {"Time_(s)":round((time.time_ns() - now_ns)/(10**9),3),"Turns_M0": round(odrv0.axis0.encoder.shadow_count/8192,3),"Turns_M1":round(odrv0.axis1.encoder.shadow_count/8192,3),"Current_M0":round(odrv0.axis0.motor.current_control.Iq_measured,3),"Current_M1": round(odrv0.axis1.motor.current_control.Iq_measured,3)}
+        writer.writerow(data_row)
+
+    print("M0 Current", round(odrv0.axis0.motor.current_control.Iq_measured,2), " | Step Count", round(odrv0.axis0.encoder.shadow_count,2), " | Turn Count", round(odrv0.axis0.encoder.shadow_count/8192,2))
+    print("M1 Current", round(odrv0.axis1.motor.current_control.Iq_measured,2), " | Step Count", round(odrv0.axis1.encoder.shadow_count,2), " | Turn Count", round(odrv0.axis1.encoder.shadow_count/8192,2))
+
+
 def test_procedure(odrv0):
 
     print("entered test procedure")
@@ -223,10 +244,10 @@ def test_procedure(odrv0):
     odrv0.axis1.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
 
     # check with the ones in the current config first - before today both 2, 15 is highest tested
-    odrv0.axis0.controller.config.input_filter_bandwidth = 20
-    odrv0.axis1.controller.config.input_filter_bandwidth = 20
+    odrv0.axis0.controller.config.input_filter_bandwidth = 10
+    odrv0.axis1.controller.config.input_filter_bandwidth = 10
 
-    #'''
+    '''
     # 1. Up, circle, down
     # waypoints from ThrustVectMockup1 matlab - need to fix kinematics.py
     amax = 7*3.14159/180; # maximum gimbal angle in radians
@@ -245,8 +266,9 @@ def test_procedure(odrv0):
 
 
     for i in turns:
-        print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
-        print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
+        data(odrv0)
+        #print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
+        #print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
         currents.append(max(odrv0.axis0.motor.current_control.Iq_measured,odrv0.axis1.motor.current_control.Iq_measured))
         odrv0.axis0.controller.input_pos=i[0]
         odrv0.axis1.controller.input_pos=i[1]
@@ -260,7 +282,7 @@ def test_procedure(odrv0):
     '''
 
 
-    '''
+    #'''
     # 2. x axis step sweep (inner gimbal)
     # note on the kinematics: would probably be less load on the pi by feeding waypoints, but the kinematics have to be done in real time anyways for flight
     def sinesweep(x,a=0.5,amax=aMax):
@@ -305,8 +327,9 @@ def test_procedure(odrv0):
         currents.append(max(odrv0.axis0.motor.current_control.Iq_measured,odrv0.axis1.motor.current_control.Iq_measured))
 
         print("Actuator target turns: ", actTurns[0],", ", actTurns[1])
-        print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
-        print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
+        #print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
+        #print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
+        data(odrv0)
 
         #data collection
         times.append(round(t,3))
@@ -314,6 +337,7 @@ def test_procedure(odrv0):
         one_target.append(round(float(actTurns[1]),2))
         zero_pos.append(round(float(odrv0.axis0.encoder.shadow_count/8192),2))
         one_pos.append(round(float(odrv0.axis1.encoder.shadow_count/8192),2))
+        
 
         
 
@@ -325,7 +349,7 @@ def test_procedure(odrv0):
 
     time.sleep(2)
     
-    '''
+    #'''
 
     '''
     # 3. y axis step sweep (outer gimbal)
@@ -362,8 +386,9 @@ def test_procedure(odrv0):
         currents.append(max(odrv0.axis0.motor.current_control.Iq_measured,odrv0.axis1.motor.current_control.Iq_measured))
 
         print("Actuator target turns: ", actTurns[0],", ", actTurns[1])
-        print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
-        print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
+        #print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
+        #print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
+        data(odrv0)
         
     y_sweep_max_current = max(currents)    
     print("Max current hit: ", y_sweep_max_current)
@@ -392,9 +417,23 @@ odrv0.axis1.requested_state = AXIS_STATE_IDLE
 
 print("Done")
 
-#plt.plot(times,one_pos)
-#plt.plot(times,one_target)
 
-#plt.show()
+'''
+
+now = datetime.now()
+current_time = now.strftime("%H:%M:%S")
+data_file = f"TEST_LOG_{date.today()}_{current_time}"
+
+try:
+    with open(data_file,"x", newline='') as logfile:
+        csv_writer = csv.writer(logfile)
+        logfile_header = ["Time_(s)","Turns_M0","Turns_M1", "Current_M0", "Current_M1"]
+        writer = csv.DictWriter(logfile,fieldnames=logfile_header)
+        writer.writeheader
+except FileExistsError:
+    pass
+
+'''
+
 
 
