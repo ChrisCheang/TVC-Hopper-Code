@@ -211,17 +211,17 @@ now = datetime.now()
 now_ns = time.time_ns()
 current_time = now.strftime("%H_%M_%S")
 data_file = f"TEST_LOG_{date.today()}_{current_time}.csv"
-logfile_header = ["Time_(s)","Turns_M0","Turns_M1", "Current_M0", "Current_M1"]
+logfile_header = ["Time_(s)","Target_M0","Target_M1","Turns_M0","Turns_M1", "Current_M0", "Current_M1"]
 
 with open(data_file, "a", newline='') as logfile:
     writer = csv.DictWriter(logfile, fieldnames=logfile_header)
     writer.writeheader()  
     
 
-def data(odrv0):
+def data(odrv0, Target_M0=0, Target_M1=0):
     with open(data_file,"a", newline='') as logfile: 
         writer = csv.DictWriter(logfile, fieldnames=logfile_header)
-        data_row = {"Time_(s)":round((time.time_ns() - now_ns)/(10**9),3),"Turns_M0": round(odrv0.axis0.encoder.shadow_count/8192,3),"Turns_M1":round(odrv0.axis1.encoder.shadow_count/8192,3),"Current_M0":round(odrv0.axis0.motor.current_control.Iq_measured,3),"Current_M1": round(odrv0.axis1.motor.current_control.Iq_measured,3)}
+        data_row = {"Time_(s)":round((time.time_ns() - now_ns)/(10**9),3),"Target_M0": Target_M0,"Target_M1": Target_M1,"Turns_M0": round(odrv0.axis0.encoder.shadow_count/8192,3),"Turns_M1":round(odrv0.axis1.encoder.shadow_count/8192,3),"Current_M0":round(odrv0.axis0.motor.current_control.Iq_measured,3),"Current_M1": round(odrv0.axis1.motor.current_control.Iq_measured,3)}
         writer.writerow(data_row)
 
     print("M0 Current", round(odrv0.axis0.motor.current_control.Iq_measured,2), " | Step Count", round(odrv0.axis0.encoder.shadow_count,2), " | Turn Count", round(odrv0.axis0.encoder.shadow_count/8192,2))
@@ -329,7 +329,7 @@ def test_procedure(odrv0):
         print("Actuator target turns: ", actTurns[0],", ", actTurns[1])
         #print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
         #print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
-        data(odrv0)
+        data(odrv0, actTurns[0], actTurns[1])
 
         #data collection
         times.append(round(t,3))
