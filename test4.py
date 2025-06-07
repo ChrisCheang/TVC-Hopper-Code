@@ -224,8 +224,7 @@ def data(odrv0, Target_M0=0, Target_M1=0):
         data_row = {"Time_(s)":round((time.time_ns() - now_ns)/(10**9),3),"Target_M0": Target_M0,"Target_M1": Target_M1,"Turns_M0": round(odrv0.axis0.encoder.shadow_count/8192,3),"Turns_M1":round(odrv0.axis1.encoder.shadow_count/8192,3),"Current_M0":round(odrv0.axis0.motor.current_control.Iq_measured,3),"Current_M1": round(odrv0.axis1.motor.current_control.Iq_measured,3)}
         writer.writerow(data_row)
 
-    print("M0 Current", round(odrv0.axis0.motor.current_control.Iq_measured,2), " | Step Count", round(odrv0.axis0.encoder.shadow_count,2), " | Turn Count", round(odrv0.axis0.encoder.shadow_count/8192,2))
-    print("M1 Current", round(odrv0.axis1.motor.current_control.Iq_measured,2), " | Step Count", round(odrv0.axis1.encoder.shadow_count,2), " | Turn Count", round(odrv0.axis1.encoder.shadow_count/8192,2))
+    print("M0 Current", round(odrv0.axis0.motor.current_control.Iq_measured,2), " | Turn Count", round(odrv0.axis0.encoder.shadow_count/8192,2), "M1 Current", round(odrv0.axis1.motor.current_control.Iq_measured,2), " | Turn Count", round(odrv0.axis1.encoder.shadow_count/8192,2))
 
 
 def test_procedure(odrv0):
@@ -244,10 +243,21 @@ def test_procedure(odrv0):
     odrv0.axis1.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
 
     # check with the ones in the current config first - before today both 2, 15 is highest tested
-    odrv0.axis0.controller.config.input_filter_bandwidth = 10
-    odrv0.axis1.controller.config.input_filter_bandwidth = 10
+    #odrv0.axis0.controller.config.input_filter_bandwidth = 17
+    #odrv0.axis1.controller.config.input_filter_bandwidth = 17
 
-    '''
+    #odrv0.axis0.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
+    #odrv0.axis0.trap_traj.config.vel_limit = 100000
+    #odrv0.axis0.trap_traj.config.accel_limit = 900
+    #odrv0.axis0.trap_traj.config.decel_limit = 900
+
+    #odrv0.axis1.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
+    #odrv0.axis1.trap_traj.config.vel_limit = 100000
+    #odrv0.axis1.trap_traj.config.accel_limit = 900
+    #odrv0.axis1.trap_traj.config.decel_limit = 900
+
+
+    #'''
     # 1. Up, circle, down
     # waypoints from ThrustVectMockup1 matlab - need to fix kinematics.py
     amax = 7*3.14159/180; # maximum gimbal angle in radians
@@ -266,7 +276,7 @@ def test_procedure(odrv0):
 
 
     for i in turns:
-        data(odrv0)
+        data(odrv0, i[0], i[1])
         #print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
         #print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
         currents.append(max(odrv0.axis0.motor.current_control.Iq_measured,odrv0.axis1.motor.current_control.Iq_measured))
@@ -279,10 +289,10 @@ def test_procedure(odrv0):
 
     odrv0.axis0.controller.input_pos = 0
     odrv0.axis1.controller.input_pos = 0
-    '''
-
-
     #'''
+
+
+    '''
     # 2. x axis step sweep (inner gimbal)
     # note on the kinematics: would probably be less load on the pi by feeding waypoints, but the kinematics have to be done in real time anyways for flight
     def sinesweep(x,a=0.5,amax=aMax):
@@ -318,7 +328,7 @@ def test_procedure(odrv0):
         t = t.total_seconds()
 
         # change below to change sweep type, [0,stepsweep(t)] is x sweep, [stepsweep(t),0] y sweep, [0.707*stepsweep(t),0.707*stepsweep(t)] act 0 sweep, [0.707*stepsweep(t),-0.707*stepsweep(t)] act 1 sweep
-        gimbal_angles = [0*stepsweep(t),1*stepsweep(t)]    
+        gimbal_angles = [0.707*stepsweep(t),0.707*stepsweep(t)]    
         actTurns = TVCKinematics.actuator_lengths_gimbal(gimbal_angles, offset=True, unit_turns=True)
         
         odrv0.axis0.controller.input_pos=actTurns[0]
@@ -349,7 +359,7 @@ def test_procedure(odrv0):
 
     time.sleep(2)
     
-    #'''
+    '''
 
     '''
     # 3. y axis step sweep (outer gimbal)
@@ -399,13 +409,12 @@ def test_procedure(odrv0):
     print("x sweep max current = ", x_sweep_max_current)
     print("y sweep max current = ", y_sweep_max_current)
 
-    time.sleep(2)
+    
     
     #'''
 
-    print("times = ", times)
-    print("one_pos = ", one_pos)
-    print("one_target = ", one_target)
+
+    time.sleep(2)
 
 
 test_procedure(odrv0)
