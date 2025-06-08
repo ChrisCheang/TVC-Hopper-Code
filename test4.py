@@ -80,7 +80,7 @@ global t_sleep, csv_writer
 t_sleep = 0.05
 csv_writer = None
 
-initialized = True
+initialized = False
 
 try: # Reboot causes loss of connection, use try to supress errors
     odrv0.reboot()
@@ -127,17 +127,18 @@ if not initialized:
         print(".", end="")
 
     print("starting motor 0 axis state homing (current limit)")
+    odrv0.axis0.motor.config.current_lim = 5
     odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis0.controller.config.vel_ramp_rate = 0.5
-    odrv0.axis0.motor.config.current_lim = 50
-    odrv0.axis0.controller.config.input_mode = INPUT_MODE_VEL_RAMP
-    odrv0.axis0.controller.input_vel = 500
+    odrv0.axis0.trap_traj.config.vel_limit = 1
+    odrv0.axis0.trap_traj.config.accel_limit = 1
+    odrv0.axis0.trap_traj.config.decel_limit = 1
+    odrv0.axis0.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
+    odrv0.axis0.controller.input_pos = 100
     
     while round(odrv0.axis0.motor.current_control.Iq_measured,2)<4: # Wait for calibration to be done
         #time.sleep(0.1)
         print("current: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
         
-    odrv0.axis0.controller.input_vel = 0
     odrv0.axis0.encoder.set_linear_count(int(14.5*8192))
     odrv0.axis0.requested_state = AXIS_STATE_IDLE
     
@@ -160,17 +161,18 @@ if not initialized:
         print(".", end="")
 
     print("starting motor 1 axis state homing (current limit)") # endstops not working, 21-5
+    odrv0.axis1.motor.config.current_lim = 5
     odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
-    odrv0.axis1.controller.config.vel_ramp_rate = 0.5
-    odrv0.axis1.motor.config.current_lim = 50
-    odrv0.axis1.controller.config.input_mode = INPUT_MODE_VEL_RAMP
-    odrv0.axis1.controller.input_vel = 500
+    odrv0.axis1.trap_traj.config.vel_limit = 1
+    odrv0.axis1.trap_traj.config.accel_limit = 1
+    odrv0.axis1.trap_traj.config.decel_limit = 1
+    odrv0.axis1.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
+    odrv0.axis1.controller.input_pos = 100
 
     while round(odrv0.axis1.motor.current_control.Iq_measured,2)<4: # Wait for calibration to be done
         #time.sleep(0.1)
         print("current: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
     
-    odrv0.axis1.controller.input_vel = 0
     odrv0.axis1.encoder.set_linear_count(int(14.5*8192))
     odrv0.axis1.requested_state = AXIS_STATE_IDLE
 
@@ -186,18 +188,18 @@ if not initialized:
 
     odrv0.axis0.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
     odrv0.axis0.trap_traj.config.vel_limit = 10000
-    odrv0.axis0.trap_traj.config.accel_limit = 50
-    odrv0.axis0.trap_traj.config.decel_limit = 50
+    odrv0.axis0.trap_traj.config.accel_limit = 30
+    odrv0.axis0.trap_traj.config.decel_limit = 30
 
     odrv0.axis1.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
     odrv0.axis1.trap_traj.config.vel_limit = 10000
-    odrv0.axis1.trap_traj.config.accel_limit = 50
-    odrv0.axis1.trap_traj.config.decel_limit = 50
+    odrv0.axis1.trap_traj.config.accel_limit = 30
+    odrv0.axis1.trap_traj.config.decel_limit = 30
 
     odrv0.axis0.controller.input_pos = 0
     odrv0.axis1.controller.input_pos = 0
 
-    time.sleep(2)
+    time.sleep(5)
 
     odrv0.axis0.requested_state = AXIS_STATE_IDLE
     odrv0.axis1.requested_state = AXIS_STATE_IDLE
@@ -211,7 +213,7 @@ now = datetime.now()
 now_ns = time.time_ns()
 current_time = now.strftime("%H_%M_%S")
 data_file = f"TEST_LOG_{date.today()}_{current_time}.csv"
-logfile_header = ["Time_(s)","Target_M0","Target_M1","Turns_M0","Turns_M1", "Current_M0", "Current_M1"]
+logfile_header = ["Time_(s)","Target_M0","Target_M1","Turns_M0","Turns_M1", "Current_M0", "Current_M1", "Temp_fet_M0", "Temp_fet_M1"]
 
 with open(data_file, "a", newline='') as logfile:
     writer = csv.DictWriter(logfile, fieldnames=logfile_header)
@@ -221,7 +223,14 @@ with open(data_file, "a", newline='') as logfile:
 def data(odrv0, Target_M0=0, Target_M1=0):
     with open(data_file,"a", newline='') as logfile: 
         writer = csv.DictWriter(logfile, fieldnames=logfile_header)
-        data_row = {"Time_(s)":round((time.time_ns() - now_ns)/(10**9),3),"Target_M0": Target_M0,"Target_M1": Target_M1,"Turns_M0": round(odrv0.axis0.encoder.shadow_count/8192,3),"Turns_M1":round(odrv0.axis1.encoder.shadow_count/8192,3),"Current_M0":round(odrv0.axis0.motor.current_control.Iq_measured,3),"Current_M1": round(odrv0.axis1.motor.current_control.Iq_measured,3)}
+        data_row = {"Time_(s)":round((time.time_ns() - now_ns)/(10**9),3),
+        "Target_M0": Target_M0,"Target_M1": Target_M1,
+        "Turns_M0": round(odrv0.axis0.encoder.shadow_count/8192,3),
+        "Turns_M1":round(odrv0.axis1.encoder.shadow_count/8192,3),
+        "Current_M0":round(odrv0.axis0.motor.current_control.Iq_measured,3),
+        "Current_M1": round(odrv0.axis1.motor.current_control.Iq_measured,3),
+        "Temp_fet_M0": round(odrv0.axis0.motor.fet_thermistor.temperature,3),
+        "Temp_fet_M1": round(odrv0.axis0.motor.fet_thermistor.temperature,3)}
         writer.writerow(data_row)
 
     print("M0 Current", round(odrv0.axis0.motor.current_control.Iq_measured,2), " | Turn Count", round(odrv0.axis0.encoder.shadow_count/8192,2), "M1 Current", round(odrv0.axis1.motor.current_control.Iq_measured,2), " | Turn Count", round(odrv0.axis1.encoder.shadow_count/8192,2))
@@ -236,25 +245,25 @@ def test_procedure(odrv0):
     odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
     odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
 
-    odrv0.axis0.motor.config.current_lim = 50
-    odrv0.axis1.motor.config.current_lim = 50
+    odrv0.axis0.motor.config.current_lim = 10
+    odrv0.axis1.motor.config.current_lim = 10
 
     odrv0.axis0.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
     odrv0.axis1.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
 
     # check with the ones in the current config first - before today both 2, 15 is highest tested
-    #odrv0.axis0.controller.config.input_filter_bandwidth = 17
-    #odrv0.axis1.controller.config.input_filter_bandwidth = 17
+    odrv0.axis0.controller.config.input_filter_bandwidth = 5
+    odrv0.axis1.controller.config.input_filter_bandwidth = 5
 
     #odrv0.axis0.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
     #odrv0.axis0.trap_traj.config.vel_limit = 100000
-    #odrv0.axis0.trap_traj.config.accel_limit = 900
-    #odrv0.axis0.trap_traj.config.decel_limit = 900
+    #odrv0.axis0.trap_traj.config.accel_limit = 300
+    #odrv0.axis0.trap_traj.config.decel_limit = 300
 
     #odrv0.axis1.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
     #odrv0.axis1.trap_traj.config.vel_limit = 100000
-    #odrv0.axis1.trap_traj.config.accel_limit = 900
-    #odrv0.axis1.trap_traj.config.decel_limit = 900
+    #odrv0.axis1.trap_traj.config.accel_limit = 300
+    #odrv0.axis1.trap_traj.config.decel_limit = 300
 
 
     #'''
@@ -282,17 +291,18 @@ def test_procedure(odrv0):
         currents.append(max(odrv0.axis0.motor.current_control.Iq_measured,odrv0.axis1.motor.current_control.Iq_measured))
         odrv0.axis0.controller.input_pos=i[0]
         odrv0.axis1.controller.input_pos=i[1]
-        time.sleep(0.005)
+        time.sleep(0.05)
 
 
     print("Max current hit: ", max(currents))
 
     odrv0.axis0.controller.input_pos = 0
     odrv0.axis1.controller.input_pos = 0
+
     #'''
 
 
-    '''
+    #'''
     # 2. x axis step sweep (inner gimbal)
     # note on the kinematics: would probably be less load on the pi by feeding waypoints, but the kinematics have to be done in real time anyways for flight
     def sinesweep(x,a=0.5,amax=aMax):
@@ -328,7 +338,7 @@ def test_procedure(odrv0):
         t = t.total_seconds()
 
         # change below to change sweep type, [0,stepsweep(t)] is x sweep, [stepsweep(t),0] y sweep, [0.707*stepsweep(t),0.707*stepsweep(t)] act 0 sweep, [0.707*stepsweep(t),-0.707*stepsweep(t)] act 1 sweep
-        gimbal_angles = [0.707*stepsweep(t),0.707*stepsweep(t)]    
+        gimbal_angles = [0*stepsweep(t),1*stepsweep(t)]    
         actTurns = TVCKinematics.actuator_lengths_gimbal(gimbal_angles, offset=True, unit_turns=True)
         
         odrv0.axis0.controller.input_pos=actTurns[0]
@@ -357,62 +367,7 @@ def test_procedure(odrv0):
     odrv0.axis0.controller.input_pos = 0
     odrv0.axis1.controller.input_pos = 0
 
-    time.sleep(2)
-    
-    '''
-
-    '''
-    # 3. y axis step sweep (outer gimbal)
-    # note on the kinematics: would probably be less load on the pi by feeding waypoints, but the kinematics have to be done in real time anyways for flight
-    def sinesweep(x,a=0.5,amax=aMax):
-        # function for defining sinesweep - which will then be converted to "step sweep"
-        # x is time in s, a affects frequency, amax is max angle
-
-        x = np.array(x)  # allows vectorized input
-        result = np.zeros_like(x, dtype=float)
-
-        # Apply the sinusoidal function for 2 < x < 12
-        mask = (x > 2) & (x < 12)
-        result[mask] = amax * np.sin(np.pi * (a * (x[mask] - 2) + 1)**2)
-
-        return result
-    
-    def stepsweep(x, a=0.5, amax=aMax): return amax*np.sign(sinesweep(x, a=a, amax=aMax))
-
-    start = datetime.now()
-    t = 0
-
-    currents = []
-
-    while t < 12:
-        t = datetime.now() - start
-        t = t.total_seconds()
-        gimbal_angles = [stepsweep(t),0*pi/180]
-        actTurns = TVCKinematics.actuator_lengths_gimbal(gimbal_angles, offset=True, unit_turns=True)
-        
-        odrv0.axis0.controller.input_pos=actTurns[0]
-        odrv0.axis1.controller.input_pos=actTurns[1]
-
-        currents.append(max(odrv0.axis0.motor.current_control.Iq_measured,odrv0.axis1.motor.current_control.Iq_measured))
-
-        print("Actuator target turns: ", actTurns[0],", ", actTurns[1])
-        #print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
-        #print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
-        data(odrv0)
-        
-    y_sweep_max_current = max(currents)    
-    print("Max current hit: ", y_sweep_max_current)
-
-    odrv0.axis0.controller.input_pos = 0
-    odrv0.axis1.controller.input_pos = 0
-
-    print("x sweep max current = ", x_sweep_max_current)
-    print("y sweep max current = ", y_sweep_max_current)
-
-    
-    
     #'''
-
 
     time.sleep(2)
 
@@ -427,22 +382,6 @@ odrv0.axis1.requested_state = AXIS_STATE_IDLE
 print("Done")
 
 
-'''
-
-now = datetime.now()
-current_time = now.strftime("%H:%M:%S")
-data_file = f"TEST_LOG_{date.today()}_{current_time}"
-
-try:
-    with open(data_file,"x", newline='') as logfile:
-        csv_writer = csv.writer(logfile)
-        logfile_header = ["Time_(s)","Turns_M0","Turns_M1", "Current_M0", "Current_M1"]
-        writer = csv.DictWriter(logfile,fieldnames=logfile_header)
-        writer.writeheader
-except FileExistsError:
-    pass
-
-'''
 
 
 
