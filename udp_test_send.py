@@ -6,29 +6,50 @@ import datetime
 from datetime import date
 from datetime import datetime
 
+class JSONSenderProtocol(asyncio.DatagramProtocol):
+    def __init__(self):
+        self.transport = None
+        self.counter = 0
+
+    def connection_made(self, transport):
+        self.transport = transport
+        asyncio.create_task(self.send_loop())
+
+    async def send_loop(self):
+        while True:
+            tvcinput = {
+                "type": "greeting",
+                "counter": self.counter,
+                "message": "Hello from sender!",
+                "timestamp": f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}"
+            }
+            data = json.dumps(tvcinput).encode()
+            self.transport.sendto(data)
+            print(f"Sent: {tvcinput}")
+            self.counter += 1
+            await asyncio.sleep(0.001)  # Need to keep this or else the time between send and recieve jumps to 0.1s
+
+    def error_received(self, exc):
+        print(f"Error: {exc}")
+
+    def connection_lost(self, exc):
+        print("Sender closed")
+
 
 async def main():
     print("Sending UDP message...")
 
-    tvcinput = {
-        "type": "greeting",
-        "message": "Hello from sender!",
-        "timestamp": f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}"
-    }
-    
-    message = json.dumps(tvcinput)
     loop = asyncio.get_running_loop()
 
     transport, protocol = await loop.create_datagram_endpoint(
-        asyncio.DatagramProtocol,
+        lambda: JSONSenderProtocol(),
         remote_addr=('127.0.0.1', 9999)
     )
 
-    transport.sendto(message.encode())
-    print(f"JSON packet sent")
-
-    await asyncio.sleep(1)  # Give the message time to be sent
-    transport.close()
+    try:
+        await asyncio.sleep(1)
+    finally:
+        transport.close()
 
 if __name__ == "__main__":
     asyncio.run(main())
