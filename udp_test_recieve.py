@@ -19,7 +19,7 @@ class UDPServerProtocol:
             
             dt = datetime.now() - datetime.strptime(message["timestamp"], '%Y-%m-%d %H:%M:%S.%f')
             dt = dt.total_seconds()
-            print(dt)
+            print("Elapsed time = ", dt)
         except json.JSONDecodeError:
             print(f"Received invalid JSON from {addr}: {data.decode()}")
     
