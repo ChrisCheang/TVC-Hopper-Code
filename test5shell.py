@@ -16,7 +16,6 @@ import asyncio
 import json
 
 
-
 rEngine = 32;  # radius of the actuator engine mounts
 hTopRing = 23; # axial (z) distance downwards between the pivot point and the engine top ring (bottom edge)
 hEngine = 166.9; # axial (z) distance downwards between the pivot point and the engine bottom
@@ -36,15 +35,22 @@ csv_writer = None
 initialized = True
 message = None
 
+# For watchdog timer
+last_sent_time = None
+connection_timeout = 1.0  # seconds
+
+calibrated = False
+
 class UDPServerProtocol:
     def connection_made(self, transport):
         self.transport = transport
         print("UDP server ready and listening")
 
     def datagram_received(self, data, addr):
-        global message
+        global message, last_sent_time
         try:
             message = json.loads(data.decode())
+            last_sent_time = float(time.time()) - float(message["timestamp"])
             #print(f"Received JSON from {addr}: {message}") 
         except json.JSONDecodeError:
             print(f"Received invalid JSON from {addr}: {data.decode()}")
@@ -57,7 +63,6 @@ class UDPServerProtocol:
 
 # at the moment this only includes rotate_gimbal_angles and actuator_lengths_gimbal for the sweep, spherical doesn't seem to be working
 class TVCKinematics:
-
 
     # rotate any point based on the two gimbal angles, defined positive for movement in the y or x direction respectively
     def rotate_gimbal_angles(gimbal_angles,point):
@@ -122,10 +127,15 @@ async def calibrate(odrv0):
     print("entered calibration")
     # note: once calibration is entered can't exit until completion
     time.sleep(5)
+    calibrated = True
     while True:
         await asyncio.sleep(t_sleep) #calls back to main async loop
         state = message["tvcs"]["tvc0"]["state"]
-        print(state)
+        last_sent_time = float(time.time()) - float(message["timestamp"])
+        print(state, ", last sent time = ", last_sent_time)
+        #if last_sent_time > connection_timeout:
+            #state = "lock"
+            #await lock(odrv0)
         if state != "calibrate":
             await state_machine(odrv0)
             break
@@ -140,8 +150,12 @@ async def test_procedure(odrv0):
 
     while True:
         await asyncio.sleep(t_sleep) #calls back to main async loop
-        print("test proceduring")
         state = message["tvcs"]["tvc0"]["state"]
+        last_sent_time = float(time.time()) - float(message["timestamp"])
+        print(state, ", last sent time = ", last_sent_time)
+        if last_sent_time > connection_timeout:
+            state = "lock"
+            #await lock(odrv0)
         if state != "test_procedure":
             await state_machine(odrv0)
             break
@@ -157,7 +171,11 @@ async def idle_state(odrv0):
     while True:
         await asyncio.sleep(t_sleep) #calls back to main async loop
         state = message["tvcs"]["tvc0"]["state"]
-        print(state)
+        last_sent_time = float(time.time()) - float(message["timestamp"])
+        print(state, ", last sent time = ", last_sent_time)
+        if last_sent_time > connection_timeout:
+            state = "lock"
+            #await lock(odrv0)
         if state != "idle":
             print("in idle, errornous state: ", state)
         if state in ("calibrate", "arm", "lock", "test_procedure", "demand_pos"):
@@ -174,8 +192,12 @@ async def lock(odrv0):
     while True:
         await asyncio.sleep(t_sleep) #calls back to main async loop
         state = message["tvcs"]["tvc0"]["state"]
-        print(state)
-        if state != "lock":
+        last_sent_time = float(time.time()) - float(message["timestamp"])
+        if last_sent_time > connection_timeout:
+            print("Locked, connection timeout, last sent time = ", round(last_sent_time,3), ", last input state: ", state)
+        else:
+            print(state, ", last sent time = ", last_sent_time)
+        if state != "lock" and last_sent_time < connection_timeout:
             await state_machine(odrv0)
             break
 
@@ -187,7 +209,11 @@ async def armTVC(odrv0):
     while True:
         await asyncio.sleep(t_sleep) #calls back to main async loop
         state = message["tvcs"]["tvc0"]["state"]
-        print(state)
+        last_sent_time = float(time.time()) - float(message["timestamp"])
+        print(state, ", last sent time = ", last_sent_time)
+        if last_sent_time > connection_timeout:
+            state = "lock"
+            #await lock(odrv0)
         if state != "arm":
             await state_machine(odrv0)
             break
@@ -209,28 +235,51 @@ async def demand_pos(odrv0):
         print("Gimbal angles = ", gimbal_angles)
 
         state = message["tvcs"]["tvc0"]["state"] # placeholder for state variable in json file
-        print(state)
+        last_sent_time = float(time.time()) - float(message["timestamp"])
+        print(state, ", last sent time = ", last_sent_time)
+        if last_sent_time > connection_timeout:
+            state = "lock"
+            #await lock(odrv0)
         if state != "demand_pos":
             await state_machine(odrv0)
             break
 
 
+async def watchdog():
+    global last_sent_time
+    while True:
+        await asyncio.sleep(0.001)
+        if last_sent_time is not None:
+            elapsed = float(time.time()) - last_sent_time
+            if elapsed > connection_timeout:
+                print(f"Connection timeout: No message received in {elapsed:.1f} seconds")
+                await lock(odrv0)
+                last_sent_time = None  
+
+
 async def state_machine(odrv0):
     global state
-    state = message["tvcs"]["tvc0"]["state"] # placeholder for state variable in json file
+    #state = message["tvcs"]["tvc0"]["state"] # placeholder for state variable in json file
 
-    print("state: ", state)
+    #print("state: ", state)
+    last_sent_time = float(time.time()) - float(message["timestamp"])
+    if last_sent_time > connection_timeout:
+        state = "lock"
+
 
     if state == "idle":
         await idle_state(odrv0)
 
     elif state == "calibrate":
-        delay = 0
-        print("preparing calibration...")
-        #while delay < 100:
-            #idle_state(odrv0)
-            #delay += 1
-        await calibrate(odrv0)
+        if not calibrated:
+            delay = 0
+            print("preparing calibration...")
+            #while delay < 100:
+                #idle_state(odrv0)
+                #delay += 1
+            await calibrate(odrv0)  
+        else:
+            await idle_state(odrv0)
 
     elif state == "arm":
         await armTVC(odrv0)
@@ -243,7 +292,6 @@ async def state_machine(odrv0):
 
     elif state == "demand_pos":
         await demand_pos(odrv0)
-
 
     else:
         print("error, incorrect state. Entering idle")
@@ -258,11 +306,15 @@ async def main():
         local_addr=('127.0.0.1', 9999)
     )
 
+    #asyncio.create_task(watchdog())
+
     while message is None:
         print("Waiting for initial JSON input...")
         await asyncio.sleep(0.1)
 
     await state_machine(odrv0)
+    
+
     try:
         await asyncio.sleep(3600)  # Keep server running for 1 hour
     finally:
