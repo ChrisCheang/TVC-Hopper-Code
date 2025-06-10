@@ -6,6 +6,11 @@ import datetime
 from datetime import date
 from datetime import datetime
 
+import numpy as np
+
+start = datetime.now()
+
+
 class JSONSenderProtocol(asyncio.DatagramProtocol):
     def __init__(self):
         self.transport = None
@@ -17,11 +22,20 @@ class JSONSenderProtocol(asyncio.DatagramProtocol):
 
     async def send_loop(self):
         while True:
+            now = datetime.now()
+            dt = now - start
+            dt = dt.total_seconds()
             tvcinput = {
-                "type": "greeting",
-                "counter": self.counter,
-                "message": "Hello from sender!",
-                "timestamp": f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}"
+                "tvcs":{
+                    "tvc0":{
+                        "channel":0,
+                        "state":"demand_pos", #idle, calibrate, arm, lock, test_procedure, demand_pos
+                        "gimbal_angle_0":0*np.pi/180,
+                        "gimbal_angle_1":0*np.pi/180
+                    }
+                },
+                "timestamp": f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}",
+                "counter": self.counter
             }
             data = json.dumps(tvcinput).encode()
             self.transport.sendto(data)
@@ -47,7 +61,7 @@ async def main():
     )
 
     try:
-        await asyncio.sleep(1)
+        await asyncio.sleep(3600)
     finally:
         transport.close()
 
