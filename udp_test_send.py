@@ -8,7 +8,7 @@ from datetime import datetime
 
 import numpy as np
 
-start = datetime.now()
+start = time.time()
 
 
 class JSONSenderProtocol(asyncio.DatagramProtocol):
@@ -22,19 +22,18 @@ class JSONSenderProtocol(asyncio.DatagramProtocol):
 
     async def send_loop(self):
         while True:
-            now = datetime.now()
+            now = time.time()
             dt = now - start
-            dt = dt.total_seconds()
             tvcinput = {
                 "tvcs":{
                     "tvc0":{
                         "channel":0,
-                        "state":"demand_pos", #idle, calibrate, arm, lock, test_procedure, demand_pos
+                        "state":"calibrate", #idle, calibrate, arm, lock, test_procedure, demand_pos
                         "gimbal_angle_0":0*np.pi/180,
                         "gimbal_angle_1":0*np.pi/180
                     }
                 },
-                "timestamp": f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')}",
+                "timestamp": f"{now}",
                 "counter": self.counter
             }
             data = json.dumps(tvcinput).encode()
