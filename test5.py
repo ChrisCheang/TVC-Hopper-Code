@@ -12,17 +12,53 @@ from pyquaternion import Quaternion
 
 
 # stuff for communications with json and udp
+import asyncio
 import json
-import socket
 
 
 
+class UDPServerProtocol:
+    def connection_made(self, transport):
+        self.transport = transport
+        print("UDP server ready and listening")
 
-def readjsoninput():
-    # asyncio json read input here
-    with open('tvcinput.json', 'r') as file:
-        tvcinput = json.load(file)    
-    return tvcinput
+    def datagram_received(self, data, addr):
+        try:
+            message = json.loads(data.decode())
+            print(f"Received JSON from {addr}: {message}")
+            
+            dt = datetime.now() - datetime.strptime(message["timestamp"], '%Y-%m-%d %H:%M:%S.%f')
+            dt = dt.total_seconds()
+            print("Elapsed time = ", dt)
+
+            ga0 = message["tvcs"]["tvc0"]["gimbal_angle_0"]
+            print("Gimbal angle 0 = ", ga0)
+
+        except json.JSONDecodeError:
+            print(f"Received invalid JSON from {addr}: {data.decode()}")
+    
+    def error_received(self, exc):
+        print(f"Error received: {exc}")
+
+    def connection_lost(self, exc):
+        print("Connection closed")
+
+async def main():
+    print("Starting UDP server...")
+    loop = asyncio.get_running_loop()
+    transport, protocol = await loop.create_datagram_endpoint(
+        lambda: UDPServerProtocol(),
+        local_addr=('127.0.0.1', 9999)
+    )
+    try:
+        await asyncio.sleep(3600)  # Keep server running for 1 hour
+    finally:
+        transport.close()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+
     
 
 
