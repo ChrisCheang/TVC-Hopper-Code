@@ -37,7 +37,7 @@ message = None
 
 # For watchdog timer
 last_sent_time = None
-connection_timeout = 1.0  # seconds
+connection_timeout = 5.0  # seconds
 
 calibrated = False
 tested = False
@@ -192,7 +192,6 @@ async def calibrate(odrv0):
         odrv0.axis0.controller.input_pos = 100
         
         while round(odrv0.axis0.motor.current_control.Iq_measured,2)<4: # Wait for calibration to be done
-            datafull(odrv0)
             print("current: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
             
         odrv0.axis0.encoder.set_linear_count(int(14.5*8192))
@@ -226,7 +225,6 @@ async def calibrate(odrv0):
         odrv0.axis1.controller.input_pos = 100
 
         while round(odrv0.axis1.motor.current_control.Iq_measured,2)<4: # Wait for calibration to be done
-            datafull(odrv0)
             print("current: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
         
         odrv0.axis1.encoder.set_linear_count(int(14.5*8192))
@@ -275,7 +273,6 @@ async def calibrate(odrv0):
         state = message["tvcs"]["tvc0"]["state"]
         last_sent_time = float(time.time()) - float(message["timestamp"])
         print("Calibrated: ", calibrated, ", last sent time = ", last_sent_time)
-        datafull(odrv0)
         #if last_sent_time > connection_timeout:
             #state = "lock"
             #await lock(odrv0)
@@ -323,8 +320,8 @@ async def test_procedure(odrv0):
         odrv0.axis1.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
 
         # check with the ones in the current config first - before today both 2, 15 is highest tested
-        odrv0.axis0.controller.config.input_filter_bandwidth = 15
-        odrv0.axis1.controller.config.input_filter_bandwidth = 15
+        odrv0.axis0.controller.config.input_filter_bandwidth = 16
+        odrv0.axis1.controller.config.input_filter_bandwidth = 16
 
         #odrv0.axis0.controller.config.input_mode = INPUT_MODE_TRAP_TRAJ
         #odrv0.axis0.trap_traj.config.vel_limit = 100000
@@ -419,7 +416,7 @@ async def test_procedure(odrv0):
             t = t.total_seconds()
 
             # change below to change sweep type, [0,stepsweep(t)] is x sweep, [stepsweep(t),0] y sweep, [0.707*stepsweep(t),0.707*stepsweep(t)] act 0 sweep, [0.707*stepsweep(t),-0.707*stepsweep(t)] act 1 sweep
-            gimbal_angles = [0*sinesweep(t),1*sinesweep(t)]    
+            gimbal_angles = [0.707*stepsweep(t),0.707*stepsweep(t)]    
             actTurns = TVCKinematics.actuator_lengths_gimbal(gimbal_angles, offset=True, unit_turns=True)
             
             odrv0.axis0.controller.input_pos=actTurns[0]
@@ -491,7 +488,6 @@ async def idle_state(odrv0):
         await asyncio.sleep(t_sleep) #calls back to main async loop
         state = message["tvcs"]["tvc0"]["state"]
         last_sent_time = float(time.time()) - float(message["timestamp"])
-        datafull(odrv0)
         print(state, ", last sent time = ", last_sent_time)
         if last_sent_time > connection_timeout:
             state = "lock"
@@ -578,8 +574,8 @@ async def demand_pos(odrv0):
     odrv0.axis1.controller.config.input_mode = INPUT_MODE_POS_FILTER # Activate the setpoint filter
 
     # check with the ones in the current config first - before today both 2, 15 is highest tested
-    odrv0.axis0.controller.config.input_filter_bandwidth = 10
-    odrv0.axis1.controller.config.input_filter_bandwidth = 10
+    odrv0.axis0.controller.config.input_filter_bandwidth = 16
+    odrv0.axis1.controller.config.input_filter_bandwidth = 16
 
     while True:
         await asyncio.sleep(t_sleep) #calls back to main async loop
