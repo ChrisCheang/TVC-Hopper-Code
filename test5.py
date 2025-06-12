@@ -123,6 +123,26 @@ except:
 odrv0 = odrive.find_any() # Reconnect to the Odrive
 
 
+#start full log
+#'''
+now = datetime.now()
+now_ns = time.time_ns()
+current_time = now.strftime("%H_%M_%S")
+full_file = f"FULL_LOG_{date.today()}_{current_time}.csv"
+logfile_header = ["Time_(s)","State","Target_M0","Target_M1","Turns_M0","Turns_M1", "Current_M0", "Current_M1"]
+
+with open(full_file, "a", newline='') as fullfile:
+    writer = csv.DictWriter(fullfile, fieldnames=logfile_header)
+    writer.writeheader()  
+
+def datafull(odrv0, Target_M0=0, Target_M1=0):
+    with open(full_file,"a", newline='') as fullfile: 
+        writer = csv.DictWriter(fullfile, fieldnames=logfile_header)
+        data_row = {"Time_(s)":round((time.time_ns() - now_ns)/(10**9),3),"State":f"{state}","Target_M0": Target_M0,"Target_M1": Target_M1,"Turns_M0": round(odrv0.axis0.encoder.shadow_count/8192,3),"Turns_M1":round(odrv0.axis1.encoder.shadow_count/8192,3),"Current_M0":round(odrv0.axis0.motor.current_control.Iq_measured,3),"Current_M1": round(odrv0.axis1.motor.current_control.Iq_measured,3)}
+        writer.writerow(data_row)
+#'''
+
+
 async def calibrate(odrv0):
     global state, calibrated
     if not calibrated:
@@ -172,7 +192,7 @@ async def calibrate(odrv0):
         odrv0.axis0.controller.input_pos = 100
         
         while round(odrv0.axis0.motor.current_control.Iq_measured,2)<4: # Wait for calibration to be done
-            #time.sleep(0.1)
+            datafull(odrv0)
             print("current: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
             
         odrv0.axis0.encoder.set_linear_count(int(14.5*8192))
@@ -206,7 +226,7 @@ async def calibrate(odrv0):
         odrv0.axis1.controller.input_pos = 100
 
         while round(odrv0.axis1.motor.current_control.Iq_measured,2)<4: # Wait for calibration to be done
-            #time.sleep(0.1)
+            datafull(odrv0)
             print("current: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
         
         odrv0.axis1.encoder.set_linear_count(int(14.5*8192))
@@ -243,6 +263,9 @@ async def calibrate(odrv0):
 
         print("Calibrated")
         calibrated = True
+
+
+
     else:
         print("calibrated, idling")
         odrv0.axis0.requested_state = AXIS_STATE_IDLE
@@ -252,6 +275,7 @@ async def calibrate(odrv0):
         state = message["tvcs"]["tvc0"]["state"]
         last_sent_time = float(time.time()) - float(message["timestamp"])
         print("Calibrated: ", calibrated, ", last sent time = ", last_sent_time)
+        datafull(odrv0)
         #if last_sent_time > connection_timeout:
             #state = "lock"
             #await lock(odrv0)
@@ -273,15 +297,15 @@ async def test_procedure(odrv0):
         now = datetime.now()
         now_ns = time.time_ns()
         current_time = now.strftime("%H_%M_%S")
-        data_file = f"TEST_LOG_{date.today()}_{current_time}.csv"
+        test_file = f"TEST_LOG_{date.today()}_{current_time}.csv"
         logfile_header = ["Time_(s)","Target_M0","Target_M1","Turns_M0","Turns_M1", "Current_M0", "Current_M1"]
 
-        with open(data_file, "a", newline='') as logfile:
+        with open(test_file, "a", newline='') as logfile:
             writer = csv.DictWriter(logfile, fieldnames=logfile_header)
             writer.writeheader()  
 
         def data(odrv0, Target_M0=0, Target_M1=0):
-            with open(data_file,"a", newline='') as logfile: 
+            with open(test_file,"a", newline='') as logfile: 
                 writer = csv.DictWriter(logfile, fieldnames=logfile_header)
                 data_row = {"Time_(s)":round((time.time_ns() - now_ns)/(10**9),3),"Target_M0": Target_M0,"Target_M1": Target_M1,"Turns_M0": round(odrv0.axis0.encoder.shadow_count/8192,3),"Turns_M1":round(odrv0.axis1.encoder.shadow_count/8192,3),"Current_M0":round(odrv0.axis0.motor.current_control.Iq_measured,3),"Current_M1": round(odrv0.axis1.motor.current_control.Iq_measured,3)}
                 writer.writerow(data_row)
@@ -318,8 +342,8 @@ async def test_procedure(odrv0):
         # waypoints from ThrustVectMockup1 matlab - need to fix kinematics.py
         amax = 7*3.14159/180; # maximum gimbal angle in radians
 
-        turns0 = [0, -0.46, -0.93, -1.39, -1.86, -2.32, -2.79, -3.26, -3.73, -4.2, -4.67, -4.18, -3.66, -3.1, -2.52, -1.91, -1.28, -0.65, -0.01, 0.63, 1.26, 1.88, 2.47, 3.04, 3.59, 4.09, 4.56, 4.98, 5.35, 5.67, 5.94, 6.15, 6.3, 6.39, 6.43, 6.39, 6.3, 6.15, 5.94, 5.67, 5.35, 4.98, 4.56, 4.09, 3.59, 3.04, 2.47, 1.88, 1.26, 0.63, -0.01, -0.65, -1.28, -1.91, -2.52, -3.1, -3.66, -4.18, -4.67, -5.11, -5.5, -5.83, -6.11, -6.34, -6.5, -6.59, -6.62, -6.59, -6.5, -6.34, -6.11, -5.83, -5.5, -5.11, -4.67, -4.2, -3.73, -3.26, -2.79, -2.32, -1.86, -1.39, -0.93, -0.46, 0]
-        turns1 = [0, -0.46, -0.93, -1.39, -1.86, -2.32, -2.79, -3.26, -3.73, -4.2, -4.67, -5.11, -5.5, -5.83, -6.11, -6.34, -6.5, -6.59, -6.62, -6.59, -6.5, -6.34, -6.11, -5.83, -5.5, -5.11, -4.67, -4.18, -3.66, -3.1, -2.52, -1.91, -1.28, -0.65, -0.01, 0.63, 1.26, 1.88, 2.47, 3.04, 3.59, 4.09, 4.56, 4.98, 5.35, 5.67, 5.94, 6.15, 6.3, 6.39, 6.43, 6.39, 6.3, 6.15, 5.94, 5.67, 5.35, 4.98, 4.56, 4.09, 3.59, 3.04, 2.47, 1.88, 1.26, 0.63, -0.01, -0.65, -1.28, -1.91, -2.52, -3.1, -3.66, -4.18, -4.67, -4.2, -3.73, -3.26, -2.79, -2.32, -1.86, -1.39, -0.93, -0.46, 0]
+        turns0 = [0 for i in range(50)]+[0, -0.46, -0.93, -1.39, -1.86, -2.32, -2.79, -3.26, -3.73, -4.2, -4.67, -4.18, -3.66, -3.1, -2.52, -1.91, -1.28, -0.65, -0.01, 0.63, 1.26, 1.88, 2.47, 3.04, 3.59, 4.09, 4.56, 4.98, 5.35, 5.67, 5.94, 6.15, 6.3, 6.39, 6.43, 6.39, 6.3, 6.15, 5.94, 5.67, 5.35, 4.98, 4.56, 4.09, 3.59, 3.04, 2.47, 1.88, 1.26, 0.63, -0.01, -0.65, -1.28, -1.91, -2.52, -3.1, -3.66, -4.18, -4.67, -5.11, -5.5, -5.83, -6.11, -6.34, -6.5, -6.59, -6.62, -6.59, -6.5, -6.34, -6.11, -5.83, -5.5, -5.11, -4.67, -4.2, -3.73, -3.26, -2.79, -2.32, -1.86, -1.39, -0.93, -0.46, 0]
+        turns1 = [0 for i in range(50)]+[0, -0.46, -0.93, -1.39, -1.86, -2.32, -2.79, -3.26, -3.73, -4.2, -4.67, -5.11, -5.5, -5.83, -6.11, -6.34, -6.5, -6.59, -6.62, -6.59, -6.5, -6.34, -6.11, -5.83, -5.5, -5.11, -4.67, -4.18, -3.66, -3.1, -2.52, -1.91, -1.28, -0.65, -0.01, 0.63, 1.26, 1.88, 2.47, 3.04, 3.59, 4.09, 4.56, 4.98, 5.35, 5.67, 5.94, 6.15, 6.3, 6.39, 6.43, 6.39, 6.3, 6.15, 5.94, 5.67, 5.35, 4.98, 4.56, 4.09, 3.59, 3.04, 2.47, 1.88, 1.26, 0.63, -0.01, -0.65, -1.28, -1.91, -2.52, -3.1, -3.66, -4.18, -4.67, -4.2, -3.73, -3.26, -2.79, -2.32, -1.86, -1.39, -0.93, -0.46, 0]
         
         #turns0 = [-4.67, -4.18, -3.66, -3.1, -2.52, -1.91, -1.28, -0.65, -0.01, 0.63, 1.26, 1.88, 2.47, 3.04, 3.59, 4.09, 4.56, 4.98, 5.35, 5.67, 5.94, 6.15, 6.3, 6.39, 6.43, 6.39, 6.3, 6.15, 5.94, 5.67, 5.35, 4.98, 4.56, 4.09, 3.59, 3.04, 2.47, 1.88, 1.26, 0.63, -0.01, -0.65, -1.28, -1.91, -2.52, -3.1, -3.66, -4.18, -4.67, -5.11, -5.5, -5.83, -6.11, -6.34, -6.5, -6.59, -6.62, -6.59, -6.5, -6.34, -6.11, -5.83, -5.5, -5.11, -4.67]
         #urns1 = [-4.67, -5.11, -5.5, -5.83, -6.11, -6.34, -6.5, -6.59, -6.62, -6.59, -6.5, -6.34, -6.11, -5.83, -5.5, -5.11, -4.67, -4.18, -3.66, -3.1, -2.52, -1.91, -1.28, -0.65, -0.01, 0.63, 1.26, 1.88, 2.47, 3.04, 3.59, 4.09, 4.56, 4.98, 5.35, 5.67, 5.94, 6.15, 6.3, 6.39, 6.43, 6.39, 6.3, 6.15, 5.94, 5.67, 5.35, 4.98, 4.56, 4.09, 3.59, 3.04, 2.47, 1.88, 1.26, 0.63, -0.01, -0.65, -1.28, -1.91, -2.52, -3.1, -3.66, -4.18, -4.67]
@@ -333,6 +357,7 @@ async def test_procedure(odrv0):
 
         for i in turns:
             data(odrv0, i[0], i[1])
+            datafull(odrv0, i[0], i[1])
             #print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
             #print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
             currents.append(max(odrv0.axis0.motor.current_control.Iq_measured,odrv0.axis1.motor.current_control.Iq_measured))
@@ -394,7 +419,7 @@ async def test_procedure(odrv0):
             t = t.total_seconds()
 
             # change below to change sweep type, [0,stepsweep(t)] is x sweep, [stepsweep(t),0] y sweep, [0.707*stepsweep(t),0.707*stepsweep(t)] act 0 sweep, [0.707*stepsweep(t),-0.707*stepsweep(t)] act 1 sweep
-            gimbal_angles = [0*stepsweep(t),1*stepsweep(t)]    
+            gimbal_angles = [0*sinesweep(t),1*sinesweep(t)]    
             actTurns = TVCKinematics.actuator_lengths_gimbal(gimbal_angles, offset=True, unit_turns=True)
             
             odrv0.axis0.controller.input_pos=actTurns[0]
@@ -406,6 +431,7 @@ async def test_procedure(odrv0):
             #print("current0: ",round(odrv0.axis0.motor.current_control.Iq_measured,2))
             #print("current1: ",round(odrv0.axis1.motor.current_control.Iq_measured,2))
             data(odrv0, actTurns[0], actTurns[1])
+            datafull(odrv0, actTurns[0], actTurns[1])
 
             #data collection
             times.append(round(t,3))
@@ -444,6 +470,7 @@ async def test_procedure(odrv0):
         state = message["tvcs"]["tvc0"]["state"]
         last_sent_time = float(time.time()) - float(message["timestamp"])
         print("Tested: ", tested, ", last sent time = ", last_sent_time)
+        datafull(odrv0)
         if last_sent_time > connection_timeout:
             state = "lock"
             #await lock(odrv0)
@@ -464,6 +491,7 @@ async def idle_state(odrv0):
         await asyncio.sleep(t_sleep) #calls back to main async loop
         state = message["tvcs"]["tvc0"]["state"]
         last_sent_time = float(time.time()) - float(message["timestamp"])
+        datafull(odrv0)
         print(state, ", last sent time = ", last_sent_time)
         if last_sent_time > connection_timeout:
             state = "lock"
@@ -485,6 +513,7 @@ async def lock(odrv0):
         await asyncio.sleep(t_sleep) #calls back to main async loop
         state = message["tvcs"]["tvc0"]["state"]
         last_sent_time = float(time.time()) - float(message["timestamp"])
+        datafull(odrv0)
         if last_sent_time > connection_timeout:
             print("Locked, connection timeout, last sent time = ", round(last_sent_time,3), ", last input state: ", state)
         else:
@@ -525,6 +554,7 @@ async def armTVC(odrv0):
         await asyncio.sleep(t_sleep) #calls back to main async loop
         state = message["tvcs"]["tvc0"]["state"]
         last_sent_time = float(time.time()) - float(message["timestamp"])
+        datafull(odrv0)
         print(state, ", last sent time = ", last_sent_time)
         if last_sent_time > connection_timeout:
             state = "lock"
@@ -564,10 +594,11 @@ async def demand_pos(odrv0):
 
         state = message["tvcs"]["tvc0"]["state"] # placeholder for state variable in json file
         last_sent_time = float(time.time()) - float(message["timestamp"])
+        datafull(odrv0, actTurns[0], actTurns[1])
         print(state, ", last sent time = ", last_sent_time)
         if last_sent_time > connection_timeout:
             state = "lock"
-            #await lock(odrv0)
+            await lock(odrv0)
         if state != "demand_pos":
             await state_machine(odrv0)
             break
