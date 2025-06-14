@@ -53,6 +53,26 @@ class UDPServerProtocol:
             message = json.loads(data.decode())
             last_sent_time = float(time.time()) - float(message["timestamp"])
             #print(f"Received JSON from {addr}: {message}") 
+
+            if odrv0 is not None:
+                turn_counts = [
+                    1.0,#odrv0.axis0.encoder.pos_estimate,
+                    2.0,#odrv0.axis1.encoder.pos_estimate
+                ]
+                currents = [
+                    3.0,#odrv0.axis0.motor.current_control.Iq_measured,
+                    4.0,#odrv0.axis1.motor.current_control.Iq_measured
+                ]
+
+                response = {
+                    "turn_counts": turn_counts,
+                    "currents": currents,
+                    "timestamp": time.time()
+                }
+
+                self.transport.sendto(json.dumps(response).encode(), addr)
+                #print(f"Sent feedback to {addr}: {response}")
+        
         except json.JSONDecodeError:
             print(f"Received invalid JSON from {addr}: {data.decode()}")
     
@@ -147,6 +167,8 @@ async def calibrate(odrv0):
     global state, calibrated
     if not calibrated:
         print("entered calibration")
+
+        #'''
         #odrv0.reboot()
         odrv0.clear_errors()
         
@@ -259,6 +281,9 @@ async def calibrate(odrv0):
         odrv0.axis0.requested_state = AXIS_STATE_IDLE
         odrv0.axis1.requested_state = AXIS_STATE_IDLE
 
+        
+        #'''
+        time.sleep(5)
         print("Calibrated")
         calibrated = True
 
@@ -290,6 +315,7 @@ async def test_procedure(odrv0):
 
     if not tested:
         print("open csv data log")
+        #'''
 
         now = datetime.now()
         now_ns = time.time_ns()
@@ -334,7 +360,7 @@ async def test_procedure(odrv0):
         #odrv0.axis1.trap_traj.config.decel_limit = 900
 
 
-        #'''
+        
         # 1. Up, circle, down
         # waypoints from ThrustVectMockup1 matlab - need to fix kinematics.py
         amax = 7*3.14159/180; # maximum gimbal angle in radians
@@ -522,6 +548,7 @@ async def lock(odrv0):
 async def armTVC(odrv0):
     global state
     print("entered armed")
+    #'''
 
     odrv0.axis0.motor.config.current_lim = 30
 
@@ -546,6 +573,8 @@ async def armTVC(odrv0):
     odrv0.axis0.controller.input_pos = 0
     odrv0.axis1.controller.input_pos = 0
 
+    #'''
+
     while True:
         await asyncio.sleep(t_sleep) #calls back to main async loop
         state = message["tvcs"]["tvc0"]["state"]
@@ -563,6 +592,8 @@ async def armTVC(odrv0):
 async def demand_pos(odrv0):
     global state
     print("entered continous demand position mode")
+
+    #'''
     
     odrv0.axis0.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
     odrv0.axis1.requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL
@@ -576,6 +607,8 @@ async def demand_pos(odrv0):
     # check with the ones in the current config first - before today both 2, 15 is highest tested
     odrv0.axis0.controller.config.input_filter_bandwidth = 16
     odrv0.axis1.controller.config.input_filter_bandwidth = 16
+
+    #'''
 
     while True:
         await asyncio.sleep(t_sleep) #calls back to main async loop
@@ -602,9 +635,9 @@ async def demand_pos(odrv0):
 
 async def state_machine(odrv0):
     global state
-    #state = message["tvcs"]["tvc0"]["state"] # placeholder for state variable in json file
+    state = message["tvcs"]["tvc0"]["state"] # placeholder for state variable in json file
 
-    #print("state: ", state)
+    print("state: ", state)
     last_sent_time = float(time.time()) - float(message["timestamp"])
     if last_sent_time > connection_timeout:
         state = "lock"
