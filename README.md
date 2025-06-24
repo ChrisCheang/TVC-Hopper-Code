@@ -1,1 +1,1 @@
-Current working version of state machine is test5.py
+Test5.py is the current working version of state machine, communicating with udp_test_send.py
